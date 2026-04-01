@@ -1,0 +1,42 @@
+{
+  "L1": {
+    "active_task_areas": 2,
+    "rule_count": 1,
+    "update_frequency": "rare",
+    "switch_frequency": "rare",
+    "concurrent_events": 1,
+    "block_seconds": 45
+  },
+  "L2": {
+    "active_task_areas": 3,
+    "rule_count": 1,
+    "update_frequency": "low",
+    "switch_frequency": "low",
+    "concurrent_events": 1,
+    "block_seconds": 60
+  },
+  "L3": {
+    "active_task_areas": 3,
+    "rule_count": 2,
+    "update_frequency": "medium",
+    "switch_frequency": "medium",
+    "concurrent_events": 2,
+    "block_seconds": 75
+  },
+  "L4": {
+    "active_task_areas": 3,
+    "rule_count": 2,
+    "update_frequency": "high",
+    "switch_frequency": "high",
+    "concurrent_events": 2,
+    "block_seconds": 90
+  },
+  "L5": {
+    "active_task_areas": 3,
+    "rule_count": 3,
+    "update_frequency": "very_high",
+    "switch_frequency": "high",
+    "concurrent_events": 3,
+    "block_seconds": 120
+  }
+}

@@ -1,0 +1,88 @@
+{
+  "app": {
+    "name": "Flight Cognitive Training System",
+    "version": "0.1.0",
+    "screen_width": 1280,
+    "screen_height": 800,
+    "fps": 60,
+    "default_font": null,
+    "title": "Flight Cognitive Training"
+  },
+  "ui": {
+    "colors": {
+      "background": [10, 18, 28],
+      "panel": [18, 32, 46],
+      "panel_alt": [24, 43, 62],
+      "text_primary": [230, 238, 248],
+      "text_secondary": [145, 170, 190],
+      "accent": [87, 184, 255],
+      "success": [97, 215, 135],
+      "warning": [255, 196, 87],
+      "danger": [255, 107, 107]
+    },
+    "countdown_seconds": 3,
+    "result_display_seconds": 0,
+    "placeholder_block_seconds": 12
+  },
+  "keys": {
+    "confirm": "space",
+    "control": "j",
+    "navigation": "k",
+    "communication": "l",
+    "advance": "return",
+    "back": "backspace",
+    "quit": "escape"
+  },
+  "paths": {
+    "logs_dir": "logs"
+  },
+  "logging": {
+    "event_log_headers": [
+      "timestamp_system",
+      "timestamp_relative",
+      "subject_id",
+      "session_id",
+      "module_name",
+      "block_id",
+      "difficulty_level",
+      "event_type",
+      "event_subtype",
+      "zone_or_task_area",
+      "expected_action",
+      "actual_action",
+      "correctness",
+      "reaction_time_ms",
+      "adapt_action",
+      "adapt_dimension",
+      "marker_code"
+    ],
+    "block_summary_headers": [
+      "subject_id",
+      "session_id",
+      "module_name",
+      "block_id",
+      "difficulty_level_start",
+      "difficulty_level_end",
+      "total_events",
+      "accuracy_metrics",
+      "adaptive_decision",
+      "notes"
+    ]
+  },
+  "adaptive": {
+    "promote_streak_required": 2,
+    "module_a": {
+      "hit_rate_min": 0.85,
+      "false_alarm_rate_max": 0.1,
+      "mean_rt_ms_max": 1200
+    },
+    "module_b": {
+      "overall_accuracy_min": 0.85,
+      "update_error_rate_max": 0.15,
+      "priority_error_rate_max": 0.15
+    }
+  },
+  "debug": {
+    "show_overlay": true
+  }
+}

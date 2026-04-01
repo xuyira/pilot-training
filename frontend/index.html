@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Flight Cognitive Training</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Flight Cognitive Training System</p>
+          <h1>飞行认知训练系统</h1>
+        </div>
+        <div class="topbar-meta">
+          <span id="server-status" class="status-pill">Backend Ready</span>
+          <span id="app-version" class="status-pill muted">v0.1.0</span>
+        </div>
+      </header>
+
+      <main id="app" class="page-root"></main>
+    </div>
+
+    <template id="setup-template">
+      <section class="hero-grid">
+        <div class="hero-copy card glow-card">
+          <p class="section-label">Web First</p>
+          <h2>把实验流程改成更清晰的网页交互</h2>
+          <p class="lead">
+            当前版本先保留模块 A/B 的占位逻辑，但已经把被试录入、模块切换、准备页、训练页、结果页和日志接口统一到了 Web 架构。
+          </p>
+          <div class="hero-points">
+            <div>
+              <strong>统一流程</strong>
+              <span>被试信息、模块、模式、难度一次完成配置</span>
+            </div>
+            <div>
+              <strong>可扩展 UI</strong>
+              <span>后续更适合增加调参页、结果页和实验者控制台</span>
+            </div>
+            <div>
+              <strong>保留 Python 后端</strong>
+              <span>日志、marker、后续脑电接口仍由本地 Python 处理</span>
+            </div>
+          </div>
+        </div>
+
+        <form id="setup-form" class="card form-card">
+          <div class="form-header">
+            <p class="section-label">Session Setup</p>
+            <h2>开始一轮训练</h2>
+          </div>
+
+          <label>
+            <span>被试 ID</span>
+            <input name="subject_id" placeholder="例如 12" required />
+          </label>
+
+          <label>
+            <span>Session ID</span>
+            <input name="session_id" placeholder="例如 1" required />
+          </label>
+
+          <label>
+            <span>实验员</span>
+            <input name="experimenter" placeholder="可选" />
+          </label>
+
+          <div class="segmented">
+            <button type="button" data-module="module_a" class="segment is-active">模块 A</button>
+            <button type="button" data-module="module_b" class="segment">模块 B</button>
+          </div>
+
+          <div class="segmented">
+            <button type="button" data-mode="fixed" class="segment is-active">固定难度</button>
+            <button type="button" data-mode="adaptive" class="segment">自适应难度</button>
+          </div>
+
+          <div>
+            <span class="field-label">初始等级</span>
+            <div class="level-grid" id="level-grid"></div>
+          </div>
+
+          <div class="form-footer">
+            <button type="submit" class="primary-btn">进入准备页</button>
+            <p id="setup-hint" class="muted-text"></p>
+          </div>
+        </form>
+      </section>
+    </template>
+
+    <template id="countdown-template">
+      <section class="stage card center-stage">
+        <p class="section-label">Prepare</p>
+        <h2 id="countdown-module-title"></h2>
+        <p id="countdown-mode-line" class="muted-text"></p>
+        <div id="countdown-number" class="countdown-number">3</div>
+        <p class="stage-caption">准备完成后自动进入训练页</p>
+      </section>
+    </template>
+
+    <template id="block-template">
+      <section class="training-layout">
+        <aside class="card side-panel">
+          <p class="section-label">Current Run</p>
+          <h2 id="block-module-title"></h2>
+          <p id="block-module-desc" class="muted-text"></p>
+          <div class="info-stack">
+            <div class="info-item">
+              <span>模式</span>
+              <strong id="block-mode"></strong>
+            </div>
+            <div class="info-item">
+              <span>难度</span>
+              <strong id="block-level"></strong>
+            </div>
+            <div class="info-item">
+              <span>Block</span>
+              <strong id="block-id"></strong>
+            </div>
+          </div>
+          <div class="module-lines" id="module-lines"></div>
+        </aside>
+
+        <section class="card main-stage">
+          <div class="stage-topline">
+            <div>
+              <p class="section-label">Placeholder Block</p>
+              <h2>统一训练界面骨架</h2>
+            </div>
+            <div class="timer-card">
+              <span>剩余时间</span>
+              <strong id="block-timer">12s</strong>
+            </div>
+          </div>
+
+          <div class="monitor-grid">
+            <div class="monitor-tile">动力 / 推进</div>
+            <div class="monitor-tile">导航 / 航电</div>
+            <div class="monitor-tile">通信 / 链路</div>
+            <div class="monitor-tile">任务载荷 / 系统状态</div>
+          </div>
+
+          <div class="card overlay-card">
+            <p class="section-label">Input Capture</p>
+            <h3 id="key-hints"></h3>
+            <p class="muted-text">
+              当前版本只记录按键事件和 block 结果，用于验证整体 Web 框架、日志链路和页面切换。
+            </p>
+            <div class="metrics-row">
+              <div>
+                <span>已记录事件</span>
+                <strong id="event-count">0</strong>
+              </div>
+              <div>
+                <span>最近按键</span>
+                <strong id="last-key">-</strong>
+              </div>
+              <div>
+                <span>日志目录</span>
+                <strong id="session-dir">-</strong>
+              </div>
+            </div>
+          </div>
+
+          <div class="config-panel">
+            <p class="section-label">Level Snapshot</p>
+            <pre id="level-config"></pre>
+          </div>
+        </section>
+      </section>
+    </template>
+
+    <template id="result-template">
+      <section class="result-layout">
+        <div class="card result-primary glow-card">
+          <p class="section-label">Block Summary</p>
+          <h2 id="result-title"></h2>
+          <p id="result-note" class="lead"></p>
+          <div class="result-grid">
+            <div>
+              <span>等级变化</span>
+              <strong id="result-levels"></strong>
+            </div>
+            <div>
+              <span>记录事件数</span>
+              <strong id="result-events"></strong>
+            </div>
+            <div>
+              <span>自适应决策</span>
+              <strong id="result-adapt"></strong>
+            </div>
+            <div>
+              <span>日志目录</span>
+              <strong id="result-logdir"></strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="card result-secondary">
+          <p class="section-label">Metrics</p>
+          <pre id="result-metrics"></pre>
+          <div class="result-actions">
+            <button id="restart-btn" class="primary-btn">返回首页</button>
+          </div>
+        </div>
+      </section>
+    </template>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
