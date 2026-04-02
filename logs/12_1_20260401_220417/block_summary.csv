@@ -1,2 +1,0 @@
-subject_id,session_id,module_name,block_id,difficulty_level_start,difficulty_level_end,total_events,accuracy_metrics,adaptive_decision,notes
-12,1,module_a,1,L1,L1,2,"{'total_events': 2, 'total_responses': 2, 'mean_rt': 5835, 'implemented': False}",hold,Placeholder block executed. Module internals pending.

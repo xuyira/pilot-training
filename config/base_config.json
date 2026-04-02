@@ -54,7 +54,15 @@
       "reaction_time_ms",
       "adapt_action",
       "adapt_dimension",
-      "marker_code"
+      "marker_code",
+      "window_index",
+      "window_target_count",
+      "window_nontarget_count",
+      "window_hit_rate",
+      "window_miss_rate",
+      "window_false_alarm_rate",
+      "window_mean_rt_ms",
+      "window_idle_false_alarm_count"
     ],
     "block_summary_headers": [
       "subject_id",
@@ -77,7 +85,8 @@
       "mean_rt_ms_max": 1200,
       "miss_rate_max": 0.15,
       "window_seconds": 20,
-      "promote_streak_required": 2
+      "promote_streak_required": 2,
+      "demote_streak_required": 2
     },
     "module_b": {
       "overall_accuracy_min": 0.85,

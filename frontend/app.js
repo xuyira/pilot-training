@@ -1,12 +1,12 @@
 const MODULE_A_INSTRUMENTS = [
-  {id: "airspeed", title: "空速表", code: "IAS", zone: "动力/推进", lampLeft: 6.2, lampTop: 12.2},
-  {id: "attitude", title: "姿态仪", code: "ATT", zone: "导航/航电", lampLeft: 29.4, lampTop: 12.2},
-  {id: "altimeter", title: "高度表", code: "ALT", zone: "导航/航电", lampLeft: 52.8, lampTop: 12.2},
-  {id: "turn", title: "转弯侧滑仪", code: "TRN", zone: "通信/链路", lampLeft: 76.2, lampTop: 12.2},
-  {id: "heading", title: "航向仪", code: "HDG", zone: "任务载荷/系统状态", lampLeft: 6.2, lampTop: 59.8},
-  {id: "vsi", title: "升降速度表", code: "VSI", zone: "动力/推进", lampLeft: 29.4, lampTop: 59.8},
-  {id: "engine", title: "发动机监控", code: "ENG", zone: "动力/推进", lampLeft: 52.8, lampTop: 59.8},
-  {id: "navcom", title: "导航通信", code: "COM", zone: "通信/链路", lampLeft: 76.2, lampTop: 59.8},
+  {id: "airspeed", title: "空速表", code: "IAS", zone: "动力/推进", lampLeft: 6.23, lampTop: 12.63, lampSize: 3.61},
+  {id: "attitude", title: "姿态仪", code: "ATT", zone: "导航/航电", lampLeft: 30.0, lampTop: 12.63, lampSize: 3.61},
+  {id: "altimeter", title: "高度表", code: "ALT", zone: "导航/航电", lampLeft: 53.69, lampTop: 12.63, lampSize: 3.61},
+  {id: "turn", title: "转弯侧滑仪", code: "TRN", zone: "通信/链路", lampLeft: 77.38, lampTop: 12.63, lampSize: 3.61},
+  {id: "heading", title: "航向仪", code: "HDG", zone: "任务载荷/系统状态", lampLeft: 6.23, lampTop: 58.44, lampSize: 3.61},
+  {id: "vsi", title: "升降速度表", code: "VSI", zone: "动力/推进", lampLeft: 29.92, lampTop: 58.44, lampSize: 3.61},
+  {id: "engine", title: "发动机监控", code: "ENG", zone: "动力/推进", lampLeft: 53.61, lampTop: 58.44, lampSize: 3.61},
+  {id: "navcom", title: "导航通信", code: "COM", zone: "通信/链路", lampLeft: 77.38, lampTop: 58.44, lampSize: 3.61},
 ];
 
 const state = {
@@ -106,7 +106,7 @@ function renderSetup() {
     button.classList.toggle("is-active", button.dataset.module === state.selectedModule);
     button.addEventListener("click", () => {
       state.selectedModule = button.dataset.module;
-      hint.textContent = state.bootstrap.modules[state.selectedModule].description;
+      hint.textContent = "";
       renderSetup();
     });
   });
@@ -119,7 +119,7 @@ function renderSetup() {
     });
   });
 
-  hint.textContent = state.bootstrap.modules[state.selectedModule].description;
+  hint.textContent = "";
 
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -239,9 +239,13 @@ function initializeModuleA(node) {
     windowElapsed: 0,
     lastWindowIndex: 0,
     promoteStreak: 0,
+    demoteStreak: 0,
     lastAdaptAction: "hold",
     windows: [],
     currentWindow: createWindowMetrics(1, level),
+    pendingWindowFinalize: false,
+    isFinalizingWindow: false,
+    blockEndingPending: false,
     anchorNodes: new Map(),
     lampNodes: new Map(),
   };
@@ -275,6 +279,7 @@ function renderModuleAScene() {
     lamp.className = `image-lamp-anchor ${activeIds.has(instrument.id) ? "is-active-zone" : "is-inactive-zone"}`;
     lamp.style.left = `${instrument.lampLeft}%`;
     lamp.style.top = `${instrument.lampTop}%`;
+    lamp.style.setProperty("--lamp-size", `${instrument.lampSize ?? 3.61}%`);
     lamp.innerHTML = `
       <div class="instrument-lamp ${lampClass}">
         <span class="lamp-dot"></span>
@@ -373,16 +378,28 @@ async function handleModuleAKeydown(event) {
       correctness: "correct",
       reaction_time_ms: reactionTime,
     });
-    clearModuleAEvent();
-    scheduleNextModuleAEvent();
+    await clearModuleAEvent();
+    await continueModuleAAfterEvent();
     updateBlockStats();
     return;
   }
 
+  if (activeEvent && activeEvent.type !== "target_alarm" && activeEvent.falseAlarmLogged) {
+    updateBlockStats();
+    return;
+  }
+
+  if (activeEvent && activeEvent.type !== "target_alarm") {
+    activeEvent.falseAlarmLogged = true;
+  }
+
   runtime.currentWindow.falseAlarms += 1;
+  if (!activeEvent) {
+    runtime.currentWindow.idleFalseAlarms += 1;
+  }
   await postBlockEvent({
     event_type: "response",
-    event_subtype: "false_alarm",
+    event_subtype: activeEvent ? "false_alarm" : "idle_false_alarm",
     marker_event_name: "A_false_alarm",
     difficulty_level: runtime.currentLevel,
     zone_or_task_area: activeEvent?.zone || "none",
@@ -396,7 +413,7 @@ async function handleModuleAKeydown(event) {
 
 function scheduleNextModuleAEvent() {
   const runtime = state.moduleA;
-  if (!runtime || runtime.activeEvent) {
+  if (!runtime || runtime.activeEvent || runtime.blockEndingPending || state.finishingBlock) {
     return;
   }
   if (runtime.nextEventTimeout) {
@@ -411,7 +428,7 @@ function scheduleNextModuleAEvent() {
 
 async function triggerModuleAEvent() {
   const runtime = state.moduleA;
-  if (!runtime || runtime.activeEvent) {
+  if (!runtime || runtime.activeEvent || runtime.blockEndingPending || state.finishingBlock) {
     return;
   }
   const type = pickModuleAEventType(runtime.currentLevelConfig);
@@ -427,6 +444,7 @@ async function triggerModuleAEvent() {
     instrumentId,
     zone: instrument.zone,
     startedAt,
+    falseAlarmLogged: false,
   };
   runtime.activeEvent = event;
 
@@ -436,9 +454,10 @@ async function triggerModuleAEvent() {
       void handleModuleATargetMiss();
     }, runtime.currentLevelConfig.response_window_ms);
   } else {
-    runtime.activeEventTimeout = window.setTimeout(() => {
-      clearModuleAEvent();
-      scheduleNextModuleAEvent();
+    runtime.currentWindow.nonTargets += 1;
+    runtime.activeEventTimeout = window.setTimeout(async () => {
+      await clearModuleAEvent();
+      await continueModuleAAfterEvent();
     }, runtime.currentLevelConfig.lamp_duration_ms);
   }
 
@@ -475,17 +494,33 @@ async function handleModuleATargetMiss() {
     correctness: "miss",
     reaction_time_ms: "",
   });
-  clearModuleAEvent();
-  scheduleNextModuleAEvent();
+  await clearModuleAEvent();
+  await continueModuleAAfterEvent();
   updateBlockStats();
 }
 
-function clearModuleAEvent() {
+async function clearModuleAEvent() {
   clearActiveEventTimeouts();
   if (state.moduleA) {
     state.moduleA.activeEvent = null;
+    if (state.moduleA.pendingWindowFinalize && !state.moduleA.isFinalizingWindow) {
+      state.moduleA.pendingWindowFinalize = false;
+      await finalizeModuleAWindow();
+    }
     renderModuleAScene();
   }
+}
+
+async function continueModuleAAfterEvent() {
+  const runtime = state.moduleA;
+  if (!runtime) {
+    return;
+  }
+  if (runtime.blockEndingPending) {
+    await finishBlock();
+    return;
+  }
+  scheduleNextModuleAEvent();
 }
 
 function clearActiveEventTimeouts() {
@@ -500,123 +535,157 @@ function clearActiveEventTimeouts() {
 
 function tickModuleAAdaptiveWindow() {
   const runtime = state.moduleA;
-  if (!runtime || state.selectedMode !== "adaptive") {
+  if (!runtime || state.selectedMode !== "adaptive" || runtime.isFinalizingWindow) {
     return;
   }
   const elapsedSeconds = Math.floor((performance.now() - state.blockStartedAt) / 1000);
-  const currentWindowIndex = Math.floor(elapsedSeconds / runtime.currentLevelConfig.window_seconds);
-  if (currentWindowIndex <= runtime.lastWindowIndex || elapsedSeconds === 0) {
+  const nextBoundarySeconds = (runtime.lastWindowIndex + 1) * runtime.currentLevelConfig.window_seconds;
+  if (elapsedSeconds < nextBoundarySeconds || elapsedSeconds === 0) {
     return;
   }
-  runtime.lastWindowIndex = currentWindowIndex;
+  if (runtime.activeEvent) {
+    runtime.pendingWindowFinalize = true;
+    return;
+  }
+  runtime.pendingWindowFinalize = false;
   void finalizeModuleAWindow();
 }
 
 async function finalizeModuleAWindow(force = false) {
   const runtime = state.moduleA;
-  if (!runtime) {
+  if (!runtime || runtime.isFinalizingWindow) {
     return;
   }
+  runtime.isFinalizingWindow = true;
+  try {
   const targets = runtime.currentWindow.targets;
+  const nonTargets = runtime.currentWindow.nonTargets;
   const hits = runtime.currentWindow.hits;
   const misses = runtime.currentWindow.misses;
   const falseAlarms = runtime.currentWindow.falseAlarms;
+  const idleFalseAlarms = runtime.currentWindow.idleFalseAlarms;
   const hitRate = targets ? hits / targets : 1;
   const missRate = targets ? misses / targets : 0;
-  const falseAlarmRate = targets ? falseAlarms / targets : falseAlarms > 0 ? 1 : 0;
+  const falseAlarmRate = nonTargets ? falseAlarms / nonTargets : falseAlarms > 0 ? 1 : 0;
   const meanRt = runtime.currentWindow.reactionTimes.length
     ? average(runtime.currentWindow.reactionTimes)
     : null;
 
-  let adaptAction = "hold";
-  let nextLevel = runtime.currentLevel;
-  if (state.selectedMode === "adaptive") {
-    const moduleThresholds = {
-      hitMin: state.bootstrap.adaptive.module_a.hit_rate_min,
-      falseMax: state.bootstrap.adaptive.module_a.false_alarm_rate_max,
-      missMax: state.bootstrap.adaptive.module_a.miss_rate_max,
-      meanRtMax: state.bootstrap.adaptive.module_a.mean_rt_ms_max,
-      promoteStreakRequired: state.bootstrap.adaptive.module_a.promote_streak_required,
-    };
-    const goodWindow = targets > 0
-      && hitRate >= moduleThresholds.hitMin
-      && falseAlarmRate <= moduleThresholds.falseMax
-      && missRate <= moduleThresholds.missMax
-      && (meanRt === null || meanRt <= moduleThresholds.meanRtMax);
-    const poorWindow = missRate > moduleThresholds.missMax || falseAlarmRate > moduleThresholds.falseMax || (meanRt !== null && meanRt > moduleThresholds.meanRtMax * 1.1);
+    let adaptAction = "hold";
+    let nextLevel = runtime.currentLevel;
+    if (state.selectedMode === "adaptive") {
+      const moduleThresholds = {
+        hitMin: state.bootstrap.adaptive.module_a.hit_rate_min,
+        falseMax: state.bootstrap.adaptive.module_a.false_alarm_rate_max,
+        missMax: state.bootstrap.adaptive.module_a.miss_rate_max,
+        meanRtMax: state.bootstrap.adaptive.module_a.mean_rt_ms_max,
+        promoteStreakRequired: state.bootstrap.adaptive.module_a.promote_streak_required,
+        demoteStreakRequired: state.bootstrap.adaptive.module_a.demote_streak_required ?? state.bootstrap.adaptive.module_a.promote_streak_required,
+      };
+      const goodWindow = targets > 0
+        && hitRate >= moduleThresholds.hitMin
+        && falseAlarmRate <= moduleThresholds.falseMax
+        && missRate <= moduleThresholds.missMax
+        && (meanRt === null || meanRt <= moduleThresholds.meanRtMax)
+        && idleFalseAlarms === 0;
+      const poorWindow = missRate > moduleThresholds.missMax
+        || falseAlarmRate > moduleThresholds.falseMax
+        || idleFalseAlarms > 0
+        || (meanRt !== null && meanRt > moduleThresholds.meanRtMax * 1.1);
 
-    if (goodWindow) {
-      runtime.promoteStreak += 1;
-      if (runtime.promoteStreak >= moduleThresholds.promoteStreakRequired) {
-        nextLevel = shiftLevel(runtime.currentLevel, 1);
-        adaptAction = nextLevel === runtime.currentLevel ? "hold" : "up";
-        runtime.promoteStreak = adaptAction === "up" ? 0 : runtime.promoteStreak;
-      }
-    } else {
-      runtime.promoteStreak = 0;
-      if (poorWindow) {
-        nextLevel = shiftLevel(runtime.currentLevel, -1);
-        adaptAction = nextLevel === runtime.currentLevel ? "hold" : "down";
+      if (goodWindow) {
+        runtime.promoteStreak += 1;
+        runtime.demoteStreak = 0;
+        if (runtime.promoteStreak >= moduleThresholds.promoteStreakRequired) {
+          nextLevel = shiftLevel(runtime.currentLevel, 1);
+          adaptAction = nextLevel === runtime.currentLevel ? "hold" : "up";
+          runtime.promoteStreak = adaptAction === "up" ? 0 : runtime.promoteStreak;
+        }
+      } else if (poorWindow) {
+        runtime.promoteStreak = 0;
+        runtime.demoteStreak += 1;
+        if (runtime.demoteStreak >= moduleThresholds.demoteStreakRequired) {
+          nextLevel = shiftLevel(runtime.currentLevel, -1);
+          adaptAction = nextLevel === runtime.currentLevel ? "hold" : "down";
+          runtime.demoteStreak = adaptAction === "down" ? 0 : runtime.demoteStreak;
+        }
+      } else {
+        runtime.promoteStreak = 0;
+        runtime.demoteStreak = 0;
       }
     }
-  }
 
-  runtime.windows.push({
-    index: runtime.currentWindow.index,
-    level: runtime.currentLevel,
-    hitRate,
-    missRate,
-    falseAlarmRate,
-    meanRt,
-    adaptAction,
-  });
+    runtime.windows.push({
+      index: runtime.currentWindow.index,
+      level: runtime.currentLevel,
+      targetCount: targets,
+      nonTargetCount: nonTargets,
+      hitRate,
+      missRate,
+      falseAlarmRate,
+      meanRt,
+      idleFalseAlarmCount: idleFalseAlarms,
+      adaptAction,
+    });
 
-  await postBlockEvent({
-    event_type: "adaptive",
-    event_subtype: "adaptive_window",
-    marker_event_name: state.selectedMode === "adaptive" ? `adapt_${adaptAction}` : "",
-    difficulty_level: nextLevel,
-    zone_or_task_area: "",
-    expected_action: "",
-    actual_action: "",
-    correctness: "window",
-    reaction_time_ms: meanRt ? Math.round(meanRt) : "",
-    adapt_action: state.selectedMode === "adaptive" ? adaptAction : "none",
-    adapt_dimension: "attention",
-    window_index: runtime.currentWindow.index,
-    window_hit_rate: roundTo(hitRate, 3),
-    window_miss_rate: roundTo(missRate, 3),
-    window_false_alarm_rate: roundTo(falseAlarmRate, 3),
-  });
-
-  if (state.selectedMode === "adaptive" && nextLevel !== runtime.currentLevel) {
-    runtime.currentLevel = nextLevel;
-    runtime.currentLevelConfig = getModuleALevelConfig(nextLevel);
-    runtime.activeInstrumentIds = getActiveInstrumentIds(runtime.currentLevelConfig.active_zones);
-    runtime.lastAdaptAction = adaptAction;
     await postBlockEvent({
-      event_type: "system",
-      event_subtype: "difficulty_shift",
-      marker_event_name: "difficulty_level",
+      event_type: "adaptive",
+      event_subtype: "adaptive_window",
+      marker_event_name: state.selectedMode === "adaptive" ? `adapt_${adaptAction}` : "",
       difficulty_level: nextLevel,
       zone_or_task_area: "",
       expected_action: "",
-      actual_action: nextLevel,
-      correctness: "updated",
-      reaction_time_ms: "",
-      adapt_action: adaptAction,
+      actual_action: "",
+      correctness: "window",
+      reaction_time_ms: meanRt ? Math.round(meanRt) : "",
+      adapt_action: state.selectedMode === "adaptive" ? adaptAction : "none",
       adapt_dimension: "attention",
+      window_index: runtime.currentWindow.index,
+      window_target_count: targets,
+      window_nontarget_count: nonTargets,
+      window_hit_rate: roundTo(hitRate, 3),
+      window_miss_rate: roundTo(missRate, 3),
+      window_false_alarm_rate: roundTo(falseAlarmRate, 3),
+      window_mean_rt_ms: meanRt ? Math.round(meanRt) : "",
+      window_idle_false_alarm_count: idleFalseAlarms,
     });
-    renderModuleAScene();
-  }
 
-  if (!force) {
-    runtime.currentWindow = createWindowMetrics(runtime.currentWindow.index + 1, runtime.currentLevel);
+    if (state.selectedMode === "adaptive" && nextLevel !== runtime.currentLevel) {
+      runtime.currentLevel = nextLevel;
+      runtime.currentLevelConfig = getModuleALevelConfig(nextLevel);
+      runtime.activeInstrumentIds = getActiveInstrumentIds(runtime.currentLevelConfig.active_zones);
+      runtime.lastAdaptAction = adaptAction;
+      await postBlockEvent({
+        event_type: "system",
+        event_subtype: "difficulty_shift",
+        marker_event_name: "difficulty_level",
+        difficulty_level: nextLevel,
+        zone_or_task_area: "",
+        expected_action: "",
+        actual_action: nextLevel,
+        correctness: "updated",
+        reaction_time_ms: "",
+        adapt_action: adaptAction,
+        adapt_dimension: "attention",
+      });
+      renderModuleAScene();
+    }
+
+    if (!force) {
+      runtime.lastWindowIndex = runtime.currentWindow.index;
+      runtime.currentWindow = createWindowMetrics(runtime.currentWindow.index + 1, runtime.currentLevel);
+    }
+  } finally {
+    runtime.isFinalizingWindow = false;
   }
 }
 
 async function finishBlock() {
   if (state.finishingBlock) {
+    return;
+  }
+  if (state.block?.moduleName === "module_a" && state.moduleA?.activeEvent) {
+    state.moduleA.blockEndingPending = true;
     return;
   }
   state.finishingBlock = true;
@@ -638,17 +707,63 @@ function renderResult(data) {
   setImmersiveMode(false);
   appRoot.innerHTML = "";
   const node = cloneTemplate("result-template");
-  node.querySelector("#result-title").textContent = `${state.bootstrap.modules[state.selectedModule].label} · Block ${data.summary.blockId}`;
-  node.querySelector("#result-note").textContent = data.summary.notes;
+  node.querySelector("#result-title").textContent = state.bootstrap.modules[state.selectedModule].label;
+  node.querySelector("#result-note").textContent = "";
   node.querySelector("#result-levels").textContent = `${data.summary.difficultyLevelStart} -> ${data.summary.difficultyLevelEnd}`;
   node.querySelector("#result-events").textContent = String(data.summary.totalEvents);
-  node.querySelector("#result-adapt").textContent = data.adaptAction;
   node.querySelector("#result-logdir").textContent = compactPath(data.sessionDir);
-  node.querySelector("#result-metrics").textContent = JSON.stringify(data.summary.accuracyMetrics, null, 2);
+  node.querySelector("#result-metrics").textContent = formatModuleAResultMetrics(data.summary.accuracyMetrics);
   node.querySelector("#restart-btn").addEventListener("click", () => {
     renderSetup();
   });
   appRoot.appendChild(node);
+}
+
+function formatModuleAResultMetrics(metrics) {
+  if (!metrics || typeof metrics !== "object") {
+    return "暂无指标";
+  }
+  const rows = [
+    ["目标事件数", metrics.target_count],
+    ["命中率", formatRatio(metrics.hit_rate)],
+    ["漏报率", formatRatio(metrics.miss_rate)],
+    ["误按率", formatRatio(metrics.false_alarm_rate)],
+    ["平均反应时(ms)", formatNumber(metrics.mean_rt)],
+    ["反应时波动(ms)", formatNumber(metrics.rt_std)],
+    ["前后期表现变化", formatSignedNumber(metrics.performance_drift)],
+    ["时间窗数量", metrics.window_count],
+  ];
+  return rows
+    .filter(([, value]) => value !== undefined)
+    .map(([label, value]) => `${label}: ${value === null ? "-" : value}`)
+    .join("\n");
+}
+
+function formatRatio(value) {
+  if (typeof value !== "number") {
+    return value ?? "-";
+  }
+  return `${(value * 100).toFixed(1)}%`;
+}
+
+function formatNumber(value) {
+  if (typeof value !== "number") {
+    return value ?? "-";
+  }
+  return Number.isInteger(value) ? String(value) : value.toFixed(2);
+}
+
+function formatSignedNumber(value) {
+  if (typeof value !== "number") {
+    return value ?? "-";
+  }
+  if (value > 0) {
+    return `+${value.toFixed(3)}`;
+  }
+  if (value < 0) {
+    return value.toFixed(3);
+  }
+  return "0.000";
 }
 
 async function postBlockEvent(payload) {
@@ -709,9 +824,11 @@ function createWindowMetrics(index, level) {
     index,
     level,
     targets: 0,
+    nonTargets: 0,
     hits: 0,
     misses: 0,
     falseAlarms: 0,
+    idleFalseAlarms: 0,
     reactionTimes: [],
   };
 }

@@ -1,2 +1,0 @@
-subject_id,session_id,module_name,block_id,difficulty_level_start,difficulty_level_end,total_events,accuracy_metrics,adaptive_decision,notes
-12,1,module_a,1,L1,L1,21,"{'implemented': True, 'target_count': 9, 'hit_rate': 0.0, 'miss_rate': 1.0, 'false_alarm_rate': 0.0, 'mean_rt': None, 'rt_std': None, 'performance_drift': None, 'window_count': 0}",hold,Module A immersive block executed.

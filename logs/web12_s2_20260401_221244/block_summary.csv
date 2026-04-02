@@ -1,2 +1,0 @@
-subject_id,session_id,module_name,block_id,difficulty_level_start,difficulty_level_end,total_events,accuracy_metrics,adaptive_decision,notes
-web12,s2,module_a,1,L2,L2,1,"{'total_events': 1, 'total_responses': 1, 'mean_rt': 512, 'implemented': False}",hold,Web placeholder block executed. Module internals pending.

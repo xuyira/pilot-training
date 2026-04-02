@@ -88,7 +88,7 @@
           </div>
 
           <div class="form-footer">
-            <button type="submit" class="primary-btn">进入准备页</button>
+            <button type="submit" class="primary-btn">开始训练</button>
             <p id="setup-hint" class="muted-text"></p>
           </div>
         </form>
@@ -98,7 +98,7 @@
     <template id="countdown-template">
       <section class="stage immersive-stage">
         <div class="immersive-stage-inner">
-          <p class="section-label">Prepare</p>
+          <p class="section-label">准备开始</p>
           <h2 id="countdown-module-title"></h2>
           <p id="countdown-mode-line" class="muted-text"></p>
         </div>
@@ -111,7 +111,7 @@
       <section class="immersive-block">
         <div class="immersive-hud">
           <div>
-            <p class="section-label">Training</p>
+            <p class="section-label">本次训练</p>
             <h2 id="block-module-title"></h2>
           </div>
           <div class="immersive-meta">
@@ -148,7 +148,7 @@
     <template id="result-template">
       <section class="result-layout">
         <div class="card result-primary glow-card">
-          <p class="section-label">Block Summary</p>
+          <p class="section-label">训练结果</p>
           <h2 id="result-title"></h2>
           <p id="result-note" class="lead"></p>
           <div class="result-grid">
@@ -161,10 +161,6 @@
               <strong id="result-events"></strong>
             </div>
             <div>
-              <span>自适应决策</span>
-              <strong id="result-adapt"></strong>
-            </div>
-            <div>
               <span>日志目录</span>
               <strong id="result-logdir"></strong>
             </div>
@@ -172,7 +168,7 @@
         </div>
 
         <div class="card result-secondary">
-          <p class="section-label">Metrics</p>
+          <p class="section-label">指标详情</p>
           <pre id="result-metrics"></pre>
           <div class="result-actions">
             <button id="restart-btn" class="primary-btn">返回首页</button>
