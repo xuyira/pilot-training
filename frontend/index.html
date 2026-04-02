@@ -25,23 +25,23 @@
     <template id="setup-template">
       <section class="hero-grid">
         <div class="hero-copy card glow-card">
-          <p class="section-label">Web First</p>
-          <h2>把实验流程改成更清晰的网页交互</h2>
+          <p class="section-label">System Overview</p>
+          <h2>面向飞行场景的轻量认知训练系统</h2>
           <p class="lead">
-            当前版本先保留模块 A/B 的占位逻辑，但已经把被试录入、模块切换、准备页、训练页、结果页和日志接口统一到了 Web 架构。
+            飞行认知训练的核心，不只是教飞行知识或操纵技巧，还包括对非技术认知能力的训练；但传统训练往往依赖教员经验、固定脚本或高成本模拟器，缺乏一种可低成本、可持续、可个体化调节训练挑战度的轻量系统。
           </p>
           <div class="hero-points">
             <div>
-              <strong>统一流程</strong>
-              <span>被试信息、模块、模式、难度一次完成配置</span>
+              <strong>能力拆分与重组</strong>
+              <span>围绕飞行中的关键认知需求进行抽象，构建可独立训练的模块化任务。</span>
             </div>
             <div>
-              <strong>可扩展 UI</strong>
-              <span>后续更适合增加调参页、结果页和实验者控制台</span>
+              <strong>动态难度调节</strong>
+              <span>根据训练表现调节挑战度，使受训者尽量维持在“刚好需要努力”的有效训练区间。</span>
             </div>
             <div>
-              <strong>保留 Python 后端</strong>
-              <span>日志、marker、后续脑电接口仍由本地 Python 处理</span>
+              <strong>实验友好架构</strong>
+              <span>前端负责交互呈现，后端负责日志、marker 与后续脑电接口，便于快速迭代和实验落地。</span>
             </div>
           </div>
         </div>
@@ -68,14 +68,19 @@
           </label>
 
           <div class="segmented">
-            <button type="button" data-module="module_a" class="segment is-active">模块 A</button>
-            <button type="button" data-module="module_b" class="segment">模块 B</button>
+            <button type="button" data-module="module_a" class="segment is-active">持续监控与响应控制训练</button>
+            <button type="button" data-module="module_b" class="segment">动态任务管理训练</button>
           </div>
 
           <div class="segmented">
             <button type="button" data-mode="fixed" class="segment is-active">固定难度</button>
             <button type="button" data-mode="adaptive" class="segment">自适应难度</button>
           </div>
+
+          <label>
+            <span>试验时长（分钟）</span>
+            <input name="duration_minutes" type="number" min="1" step="1" placeholder="例如 5" required />
+          </label>
 
           <div>
             <span class="field-label">初始等级</span>
@@ -91,84 +96,52 @@
     </template>
 
     <template id="countdown-template">
-      <section class="stage card center-stage">
-        <p class="section-label">Prepare</p>
-        <h2 id="countdown-module-title"></h2>
-        <p id="countdown-mode-line" class="muted-text"></p>
+      <section class="stage immersive-stage">
+        <div class="immersive-stage-inner">
+          <p class="section-label">Prepare</p>
+          <h2 id="countdown-module-title"></h2>
+          <p id="countdown-mode-line" class="muted-text"></p>
+        </div>
         <div id="countdown-number" class="countdown-number">3</div>
-        <p class="stage-caption">准备完成后自动进入训练页</p>
+        <p class="stage-caption">请保持注视，准备开始</p>
       </section>
     </template>
 
     <template id="block-template">
-      <section class="training-layout">
-        <aside class="card side-panel">
-          <p class="section-label">Current Run</p>
-          <h2 id="block-module-title"></h2>
-          <p id="block-module-desc" class="muted-text"></p>
-          <div class="info-stack">
-            <div class="info-item">
-              <span>模式</span>
-              <strong id="block-mode"></strong>
-            </div>
-            <div class="info-item">
-              <span>难度</span>
-              <strong id="block-level"></strong>
-            </div>
-            <div class="info-item">
-              <span>Block</span>
-              <strong id="block-id"></strong>
-            </div>
+      <section class="immersive-block">
+        <div class="immersive-hud">
+          <div>
+            <p class="section-label">Training</p>
+            <h2 id="block-module-title"></h2>
           </div>
-          <div class="module-lines" id="module-lines"></div>
-        </aside>
-
-        <section class="card main-stage">
-          <div class="stage-topline">
-            <div>
-              <p class="section-label">Placeholder Block</p>
-              <h2>统一训练界面骨架</h2>
-            </div>
+          <div class="immersive-meta">
             <div class="timer-card">
               <span>剩余时间</span>
               <strong id="block-timer">12s</strong>
             </div>
-          </div>
-
-          <div class="monitor-grid">
-            <div class="monitor-tile">动力 / 推进</div>
-            <div class="monitor-tile">导航 / 航电</div>
-            <div class="monitor-tile">通信 / 链路</div>
-            <div class="monitor-tile">任务载荷 / 系统状态</div>
-          </div>
-
-          <div class="card overlay-card">
-            <p class="section-label">Input Capture</p>
-            <h3 id="key-hints"></h3>
-            <p class="muted-text">
-              当前版本只记录按键事件和 block 结果，用于验证整体 Web 框架、日志链路和页面切换。
-            </p>
-            <div class="metrics-row">
-              <div>
-                <span>已记录事件</span>
-                <strong id="event-count">0</strong>
-              </div>
-              <div>
-                <span>最近按键</span>
-                <strong id="last-key">-</strong>
-              </div>
-              <div>
-                <span>日志目录</span>
-                <strong id="session-dir">-</strong>
-              </div>
+            <div class="timer-card compact">
+              <span>等级</span>
+              <strong id="block-level"></strong>
             </div>
           </div>
+        </div>
 
-          <div class="config-panel">
-            <p class="section-label">Level Snapshot</p>
-            <pre id="level-config"></pre>
+        <div id="module-scene" class="module-scene"></div>
+
+        <div class="immersive-footer">
+          <p id="key-hints"></p>
+          <p id="block-rule-line" class="muted-text"></p>
+          <p id="block-module-desc" class="muted-text"></p>
+          <div id="module-lines" class="visually-hidden"></div>
+          <div id="block-mode" class="visually-hidden"></div>
+          <div id="block-id" class="visually-hidden"></div>
+          <div id="session-dir" class="visually-hidden"></div>
+          <pre id="level-config" class="visually-hidden"></pre>
+          <div class="visually-hidden">
+            <span id="event-count">0</span>
+            <span id="last-key">-</span>
           </div>
-        </section>
+        </div>
       </section>
     </template>
 

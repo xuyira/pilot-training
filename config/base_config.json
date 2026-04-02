@@ -74,7 +74,10 @@
     "module_a": {
       "hit_rate_min": 0.85,
       "false_alarm_rate_max": 0.1,
-      "mean_rt_ms_max": 1200
+      "mean_rt_ms_max": 1200,
+      "miss_rate_max": 0.15,
+      "window_seconds": 20,
+      "promote_streak_required": 2
     },
     "module_b": {
       "overall_accuracy_min": 0.85,

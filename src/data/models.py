@@ -17,6 +17,7 @@ class RunSelection:
     module_name: str
     mode: str
     start_level: str
+    duration_minutes: int
     block_id: int = 1
 
 
@@ -36,6 +37,7 @@ class SessionContext:
         payload["module_name"] = self.selection.module_name
         payload["mode"] = self.selection.mode
         payload["start_level"] = self.selection.start_level
+        payload["duration_minutes"] = self.selection.duration_minutes
         payload["software_version"] = self.software_version
         payload.pop("participant", None)
         payload.pop("selection", None)

@@ -1,0 +1,11 @@
+{
+  "software_version": "0.1.0",
+  "date_time": "2026-04-02T12:33:37",
+  "subject_id": "12",
+  "session_id": "1",
+  "experimenter": "tester",
+  "module_name": "module_a",
+  "mode": "fixed",
+  "start_level": "L1",
+  "duration_minutes": 1
+}
