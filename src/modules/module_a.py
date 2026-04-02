@@ -5,7 +5,7 @@ from src.modules.base import ModuleSpec
 
 MODULE_A_SPEC = ModuleSpec(
     name="module_a",
-    key_hints="按 Space 确认圆形红灯关键告警，忽略菱形红灯与黄灯。按 Esc 可提前结束。",
+    key_hints="按 Space 确认圆形红灯关键告警，忽略菱形红灯与黄灯，按 Esc 可提前结束。",
     intro_lines=[
         "持续监控与响应控制训练",
         "8 仪表沉浸式监控界面",

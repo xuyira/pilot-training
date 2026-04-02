@@ -144,11 +144,14 @@ function renderSetup() {
 async function runCountdown() {
   clearTimers();
   setImmersiveMode(true);
+  if (document.activeElement instanceof HTMLElement) {
+    document.activeElement.blur();
+  }
   appRoot.innerHTML = "";
   const node = cloneTemplate("countdown-template");
-  const moduleMeta = state.bootstrap.modules[state.selectedModule];
-  node.querySelector("#countdown-module-title").textContent = moduleMeta.label;
-  node.querySelector("#countdown-mode-line").textContent = `${state.selectedMode === "fixed" ? "固定难度" : "自适应难度"} · ${state.selectedLevel} · ${state.setupForm.duration_minutes} 分钟`;
+  node.classList.toggle("countdown-minimal", state.selectedModule === "module_a");
+  node.querySelector("#countdown-module-title").textContent = "";
+  node.querySelector("#countdown-mode-line").textContent = "";
   const numberNode = node.querySelector("#countdown-number");
   appRoot.appendChild(node);
 
@@ -159,7 +162,7 @@ async function runCountdown() {
     remaining -= 1;
     if (remaining <= 0) {
       clearTimers();
-      numberNode.textContent = "1";
+      numberNode.textContent = "";
       await startBlock();
       return;
     }
@@ -186,13 +189,14 @@ function renderBlock() {
   appRoot.innerHTML = "";
   const node = cloneTemplate("block-template");
   const moduleMeta = state.bootstrap.modules[state.block.moduleName];
+  node.classList.toggle("module-a-fullscreen", state.block.moduleName === "module_a");
   node.querySelector("#block-module-title").textContent = moduleMeta.label;
   node.querySelector("#block-module-desc").textContent = "";
   node.querySelector("#block-level").textContent = state.block.level;
   node.querySelector("#block-id").textContent = `#${state.block.blockId}`;
   node.querySelector("#key-hints").textContent = state.block.moduleSpec.keyHints;
   node.querySelector("#block-rule-line").textContent = state.block.moduleName === "module_a"
-    ? "规则：仅对关键告警按 Space 确认。圆形红灯为关键告警，菱形红灯与黄灯均不响应。"
+    ? ""
     : moduleMeta.description;
   node.querySelector("#session-dir").textContent = compactPath(state.session.sessionDir);
   node.querySelector("#level-config").textContent = JSON.stringify(state.block.levelConfig, null, 2);
@@ -238,6 +242,8 @@ function initializeModuleA(node) {
     lastAdaptAction: "hold",
     windows: [],
     currentWindow: createWindowMetrics(1, level),
+    anchorNodes: new Map(),
+    lampNodes: new Map(),
   };
   renderModuleAScene();
   scheduleNextModuleAEvent();
@@ -246,6 +252,10 @@ function initializeModuleA(node) {
 function renderModuleAScene() {
   const runtime = state.moduleA;
   if (!runtime) {
+    return;
+  }
+  if (runtime.anchorNodes.size > 0) {
+    updateModuleAScene();
     return;
   }
   const activeIds = new Set(runtime.activeInstrumentIds);
@@ -270,10 +280,32 @@ function renderModuleAScene() {
         <span class="lamp-dot"></span>
       </div>
     `;
+    runtime.anchorNodes.set(instrument.id, lamp);
+    runtime.lampNodes.set(instrument.id, lamp.querySelector(".instrument-lamp"));
     lampLayer.appendChild(lamp);
   });
   panel.appendChild(lampLayer);
   runtime.sceneNode.appendChild(panel);
+  runtime.levelNode.textContent = runtime.currentLevel;
+}
+
+function updateModuleAScene() {
+  const runtime = state.moduleA;
+  if (!runtime) {
+    return;
+  }
+  const activeIds = new Set(runtime.activeInstrumentIds);
+  MODULE_A_INSTRUMENTS.forEach((instrument) => {
+    const anchor = runtime.anchorNodes.get(instrument.id);
+    const lamp = runtime.lampNodes.get(instrument.id);
+    if (!anchor || !lamp) {
+      return;
+    }
+    const event = runtime.activeEvent?.instrumentId === instrument.id ? runtime.activeEvent : null;
+    anchor.classList.toggle("is-active-zone", activeIds.has(instrument.id));
+    anchor.classList.toggle("is-inactive-zone", !activeIds.has(instrument.id));
+    lamp.className = `instrument-lamp ${event ? lampClassForEvent(event.type) : "lamp-off"}`;
+  });
   runtime.levelNode.textContent = runtime.currentLevel;
 }
 

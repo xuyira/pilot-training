@@ -129,6 +129,10 @@ body.immersive-mode .page-root {
   min-height: 100vh;
 }
 
+body.immersive-mode {
+  overflow: hidden;
+}
+
 .hero-grid {
   grid-template-columns: 1.15fr 0.85fr;
   align-items: stretch;
@@ -340,6 +344,26 @@ button:focus {
   gap: 14px;
 }
 
+.countdown-minimal {
+  min-height: 100vh;
+  padding: 0;
+  caret-color: transparent;
+  display: grid;
+  place-items: center;
+  grid-template-rows: 1fr;
+}
+
+.countdown-minimal .immersive-stage-inner,
+.countdown-minimal .stage-caption {
+  display: none;
+}
+
+.countdown-minimal .countdown-number {
+  margin: 0;
+  line-height: 1;
+  align-self: center;
+}
+
 .training-layout {
   grid-template-columns: 320px 1fr;
   align-items: start;
@@ -434,6 +458,49 @@ button:focus {
   color: var(--muted);
 }
 
+.module-a-fullscreen {
+  min-height: 100vh;
+  padding: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  background:
+    radial-gradient(circle at 20% 12%, rgba(105, 208, 255, 0.08), transparent 28%),
+    linear-gradient(180deg, #07111b 0%, #091521 40%, #050c14 100%);
+}
+
+.module-a-fullscreen .immersive-hud {
+  display: none;
+}
+
+.module-a-fullscreen .module-scene {
+  min-height: 0;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+
+.module-a-fullscreen .cockpit-scene {
+  padding: 0;
+}
+
+.module-a-fullscreen .immersive-footer {
+  gap: 0;
+  margin-top: 0;
+  padding: 12px 20px 16px;
+}
+
+.module-a-fullscreen #block-rule-line,
+.module-a-fullscreen #block-module-desc {
+  display: none;
+}
+
+.module-a-fullscreen #key-hints {
+  margin: 0;
+  font-size: 0.95rem;
+  color: rgba(226, 237, 245, 0.82);
+}
+
 .cockpit-scene {
   position: relative;
   display: grid;
@@ -443,7 +510,9 @@ button:focus {
 
 .cockpit-image-panel {
   position: relative;
-  width: min(1376px, 100%);
+  width: min(100vw, calc((100vh - 52px) * 1.7917));
+  max-width: 100vw;
+  max-height: calc(100vh - 52px);
   aspect-ratio: 1376 / 768;
   border-radius: 26px;
   overflow: hidden;
@@ -465,16 +534,16 @@ button:focus {
 .cockpit-image-panel::before {
   content: "";
   position: absolute;
-  right: 1.8%;
-  bottom: 3.1%;
-  width: 4.4%;
-  height: 7.8%;
+  right: 1.75%;
+  bottom: 3.15%;
+  width: 4%;
+  aspect-ratio: 1;
   border-radius: 50%;
   background:
-    radial-gradient(circle at 45% 45%, rgba(86, 102, 112, 0.88), rgba(30, 38, 44, 0.96) 70%, rgba(12, 16, 20, 0.98) 100%);
+    radial-gradient(circle at 42% 42%, rgba(118, 130, 140, 0.92), rgba(52, 62, 70, 0.98) 68%, rgba(22, 28, 34, 1) 100%);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.14),
-    0 4px 10px rgba(0, 0, 0, 0.35);
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 6px 14px rgba(0, 0, 0, 0.28);
   pointer-events: none;
   z-index: 1;
 }
@@ -654,5 +723,6 @@ pre {
   .cockpit-image-panel {
     width: 100%;
     border-radius: 18px;
+    max-height: calc(100vh - 68px);
   }
 }
