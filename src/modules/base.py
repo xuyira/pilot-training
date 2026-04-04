@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from src.core.metrics import build_module_a_metrics, build_placeholder_metrics
+from src.core.metrics import build_module_a_metrics, build_module_b_metrics, build_placeholder_metrics
 from src.data.models import BlockSummary, SessionContext
 
 
@@ -24,7 +24,12 @@ def build_block_summary(
     events: list[dict[str, Any]],
     notes: str,
 ) -> BlockSummary:
-    metrics = build_module_a_metrics(events) if context.selection.module_name == "module_a" else build_placeholder_metrics(events)
+    if context.selection.module_name == "module_a":
+        metrics = build_module_a_metrics(events)
+    elif context.selection.module_name == "module_b":
+        metrics = build_module_b_metrics(events)
+    else:
+        metrics = build_placeholder_metrics(events)
     return BlockSummary(
         subject_id=context.participant.subject_id,
         session_id=context.participant.session_id,

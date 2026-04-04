@@ -62,7 +62,20 @@
       "window_miss_rate",
       "window_false_alarm_rate",
       "window_mean_rt_ms",
-      "window_idle_false_alarm_count"
+      "window_idle_false_alarm_count",
+      "task_id",
+      "drone_id",
+      "recommended_drone_id",
+      "task_priority",
+      "task_type",
+      "rule_version",
+      "queue_size",
+      "timeout_count",
+      "assignment_accuracy",
+      "priority_accuracy",
+      "rule_violation_rate",
+      "timeout_rate",
+      "window_assignment_count"
     ],
     "block_summary_headers": [
       "subject_id",
@@ -89,9 +102,14 @@
       "demote_streak_required": 2
     },
     "module_b": {
-      "overall_accuracy_min": 0.85,
-      "update_error_rate_max": 0.15,
-      "priority_error_rate_max": 0.15
+      "assignment_accuracy_min": 0.82,
+      "priority_accuracy_min": 0.8,
+      "rule_violation_rate_max": 0.18,
+      "timeout_rate_max": 0.2,
+      "mean_decision_time_ms_max": 5200,
+      "window_seconds": 20,
+      "promote_streak_required": 2,
+      "demote_streak_required": 2
     }
   },
   "debug": {

@@ -219,7 +219,11 @@ class SessionManager:
             start_level=level,
             end_level=next_level,
             events=session.events,
-            notes="Module A immersive block executed." if context.selection.module_name == "module_a" else "Web placeholder block executed. Module internals pending.",
+            notes=(
+                "Module A immersive block executed."
+                if context.selection.module_name == "module_a"
+                else "Module B multi-drone assignment block executed."
+            ),
         )
         summary.adaptive_decision = adapt_action
         session.session_logger.log_block_summary(summary)

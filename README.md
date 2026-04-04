@@ -13,9 +13,14 @@ This version has been migrated from the early Pygame shell to a browser-based ar
 
 The shared workflow is already wired:
 
-`被试信息 -> 模块选择 -> 模式选择 -> 初始难度 -> 准备页 -> 占位 block -> 结果页`
+`被试信息 -> 模块选择 -> 模式选择 -> 初始难度 -> 准备页 -> 训练 block -> 结果页`
 
-Module A and Module B are still placeholder implementations. The current goal is to keep the system runnable, loggable, and easy to extend.
+Current module status:
+
+- Module A: immersive alarm-monitoring task with adaptive windows
+- Module B: multi-drone assignment minigame with fixed and adaptive difficulty
+
+The current goal is to keep the system runnable, loggable, and easy to extend.
 
 ## Architecture
 
@@ -66,4 +71,4 @@ Each run creates a session folder in `logs/` with:
 
 - No third-party runtime dependency is required for the current web scaffold.
 - The previous desktop-style Pygame logic is no longer the default runtime path.
-- The next step is to replace placeholder block behavior with real Module A and Module B task logic.
+- The next step is to iterate task depth, metrics, and experiment-facing controls.

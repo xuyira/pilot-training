@@ -28,5 +28,8 @@
   "B_dual_event": 606,
   "B_correct": 607,
   "B_old_rule_error": 608,
-  "B_priority_error": 609
+  "B_priority_error": 609,
+  "B_rule_violation": 610,
+  "B_suboptimal": 611,
+  "B_timeout": 612
 }
