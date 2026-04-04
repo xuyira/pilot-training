@@ -32,6 +32,21 @@ const MODULE_B_TASK_TEMPLATES = [
   {type: "delivery", label: "紧急投送", batteryRange: [34, 54]},
 ];
 
+const MODULE_C_DRONE_TEMPLATES = [
+  {id: "R1", type: "recon_drone", label: "侦察机", short: "侦", targetType: "recon"},
+  {id: "F2", type: "fighter_drone", label: "歼击机", short: "歼", targetType: "intercept"},
+  {id: "L3", type: "relay_drone", label: "中继机", short: "继", targetType: "relay"},
+  {id: "C4", type: "cargo_drone", label: "运输机", short: "运", targetType: "supply"},
+  {id: "R5", type: "recon_drone", label: "侦察机", short: "侦", targetType: "recon"},
+];
+
+const MODULE_C_TARGET_META = {
+  recon: {label: "侦查区", short: "侦"},
+  intercept: {label: "敌机", short: "敌"},
+  relay: {label: "中继点", short: "继"},
+  supply: {label: "补给点", short: "补"},
+};
+
 const state = {
   bootstrap: null,
   session: null,
@@ -53,6 +68,7 @@ const state = {
   },
   moduleA: null,
   moduleB: null,
+  moduleC: null,
 };
 
 const appRoot = document.querySelector("#app");
@@ -79,6 +95,7 @@ function renderSetup() {
   state.block = null;
   state.moduleA = null;
   state.moduleB = null;
+  state.moduleC = null;
   state.eventCount = 0;
   state.lastKey = "-";
   state.finishingBlock = false;
@@ -213,6 +230,7 @@ function renderBlock() {
   const node = cloneTemplate("block-template");
   const moduleMeta = state.bootstrap.modules[state.block.moduleName];
   node.classList.toggle("module-a-fullscreen", state.block.moduleName === "module_a");
+  node.classList.toggle("module-c-fullscreen", state.block.moduleName === "module_c");
   node.querySelector("#block-module-title").textContent = moduleMeta.label;
   node.querySelector("#block-module-desc").textContent = "";
   node.querySelector("#block-level").textContent = state.block.level;
@@ -227,8 +245,10 @@ function renderBlock() {
 
   if (state.block.moduleName === "module_a") {
     initializeModuleA(node);
-  } else {
+  } else if (state.block.moduleName === "module_b") {
     initializeModuleB(node);
+  } else {
+    initializeModuleC(node);
   }
 
   window.addEventListener("keydown", handleBlockKeydown);
@@ -243,6 +263,9 @@ function renderBlock() {
     if (state.moduleB) {
       tickModuleB();
       tickModuleBAdaptiveWindow();
+    }
+    if (state.moduleC) {
+      tickModuleC();
     }
     if (remaining <= 0) {
       await finishBlock();
@@ -313,6 +336,16 @@ function initializeModuleB(node) {
   scheduleNextModuleBSpawn();
   scheduleNextModuleBRuleUpdate();
   renderModuleBScene();
+}
+
+function initializeModuleC(node) {
+  const level = state.block.level;
+  const levelConfig = getModuleCLevelConfig(level);
+  const runtime = buildModuleCRuntime(node, level, levelConfig);
+  state.moduleC = runtime;
+  renderModuleCScene();
+  void logInitialModuleCTargets(runtime);
+  scheduleModuleCDynamicEvents(runtime);
 }
 
 function renderModuleAScene() {
@@ -508,6 +541,186 @@ function renderModuleBScene() {
   `;
 }
 
+function buildModuleCRuntime(node, level, levelConfig) {
+  const grid = generateModuleCGrid(levelConfig);
+  const drones = createModuleCDrones(levelConfig, grid);
+  const targets = createModuleCTargets(levelConfig, grid, drones);
+  return {
+    sceneNode: node.querySelector("#module-scene"),
+    levelNode: node.querySelector("#block-level"),
+    ruleNode: node.querySelector("#block-rule-line"),
+    currentLevel: level,
+    currentLevelConfig: levelConfig,
+    grid,
+    drones,
+    targets,
+    selectedDroneId: drones[0]?.id ?? "",
+    hoveredCellKey: "",
+    lastTickAt: performance.now(),
+    eventFeed: ["局面建立完成"],
+    completedCount: 0,
+    crashedCount: 0,
+    pendingHazardTimeouts: [],
+    pendingTargetTimeouts: [],
+  };
+}
+
+function renderModuleCScene() {
+  const runtime = state.moduleC;
+  if (!runtime) {
+    return;
+  }
+  runtime.sceneNode.className = "module-scene module-c-scene";
+  runtime.levelNode.textContent = runtime.currentLevel;
+  runtime.ruleNode.textContent = "事实提示区不会给出推荐路线或危险预警。";
+  const selectedDrone = getSelectedModuleCDrone(runtime);
+  const boardMarkup = buildModuleCBoardMarkup(runtime);
+  const remainingTargets = runtime.targets.filter((item) => !item.completed).length;
+  const eventMarkup = runtime.eventFeed.length
+    ? runtime.eventFeed.map((item) => `<li>${item}</li>`).join("")
+    : "<li>暂无事件</li>";
+  const selectedPathLength = selectedDrone?.path.length ?? 0;
+  const eta = selectedDrone ? formatModuleCEta(selectedPathLength, runtime.currentLevelConfig.speed_cells_per_second) : "-";
+  runtime.sceneNode.innerHTML = `
+    <section class="module-c-main">
+      <div
+        class="module-c-board"
+        style="grid-template-columns: repeat(${runtime.currentLevelConfig.grid_cols}, minmax(0, 1fr));"
+      >${boardMarkup}</div>
+    </section>
+    <aside class="module-c-side">
+      <section class="module-c-side-card">
+        <div class="module-c-stats">
+          <div>
+            <p class="section-label">状态提示</p>
+            <h2>当前局面</h2>
+          </div>
+          <div class="module-c-stats-grid">
+            <div class="module-c-stat"><span>已完成目标</span><strong>${runtime.completedCount}</strong></div>
+            <div class="module-c-stat"><span>剩余目标</span><strong>${remainingTargets}</strong></div>
+            <div class="module-c-stat"><span>坠毁数量</span><strong>${runtime.crashedCount}</strong></div>
+            <div class="module-c-stat"><span>速度</span><strong>${runtime.currentLevelConfig.speed_cells_per_second} 格/秒</strong></div>
+          </div>
+          <div class="module-c-selected">
+            <div>
+              <p class="section-label">当前选中</p>
+              <h2>${selectedDrone ? selectedDrone.id : "未选中无人机"}</h2>
+            </div>
+            <div class="module-c-selected-grid">
+              <div class="module-c-info"><span>类型</span><strong>${selectedDrone ? selectedDrone.label : "-"}</strong></div>
+              <div class="module-c-info"><span>状态</span><strong>${selectedDrone ? formatModuleCDroneStatus(selectedDrone) : "-"}</strong></div>
+              <div class="module-c-info"><span>位置</span><strong>${selectedDrone ? formatModuleCCell(selectedDrone.cell) : "-"}</strong></div>
+              <div class="module-c-info"><span>剩余路径</span><strong>${selectedPathLength} 格</strong></div>
+              <div class="module-c-info"><span>预计到达</span><strong>${eta}</strong></div>
+              <div class="module-c-info"><span>连续任务数</span><strong>${selectedDrone?.taskChain.length ?? 0}</strong></div>
+            </div>
+          </div>
+          <div class="module-c-events">
+            <p class="section-label">事实提示</p>
+            <ul>${eventMarkup}</ul>
+          </div>
+        </div>
+      </section>
+      <section class="module-c-side-card">
+        <div class="module-c-rules">
+          <div>
+            <p class="section-label">规则说明</p>
+            <h2>操作与结算</h2>
+          </div>
+          <ul>
+            <li>左键选中无人机，右键在同一行或同一列上追加直线路径点。</li>
+            <li>Enter 执行当前已规划路径，Space 暂停或继续当前无人机。</li>
+            <li>Backspace 删除最后一个未来路径点，C 清空未来路径。</li>
+            <li>错误机型到点不算完成；进入危险区立即坠毁。</li>
+          </ul>
+        </div>
+      </section>
+    </aside>
+  `;
+
+  runtime.sceneNode.querySelectorAll("[data-cell-x]").forEach((cellNode) => {
+    cellNode.addEventListener("click", (event) => {
+      const x = Number(event.currentTarget.dataset.cellX);
+      const y = Number(event.currentTarget.dataset.cellY);
+      handleModuleCCellLeftClick(x, y);
+    });
+    cellNode.addEventListener("contextmenu", (event) => {
+      event.preventDefault();
+      const x = Number(event.currentTarget.dataset.cellX);
+      const y = Number(event.currentTarget.dataset.cellY);
+      void handleModuleCCellRightClick(x, y);
+    });
+  });
+}
+
+function buildModuleCBoardMarkup(runtime) {
+  const selectedDrone = getSelectedModuleCDrone(runtime);
+  const pathKeys = new Set(selectedDrone?.path.map((cell) => moduleCCellKey(cell.x, cell.y)) ?? []);
+  const waypointLabels = new Map((selectedDrone?.waypoints ?? []).map((cell, index) => [moduleCCellKey(cell.x, cell.y), index + 1]));
+  const startKey = selectedDrone ? moduleCCellKey(selectedDrone.cell.x, selectedDrone.cell.y) : "";
+  const endWaypoint = selectedDrone?.waypoints[selectedDrone.waypoints.length - 1] ?? null;
+  const endKey = endWaypoint ? moduleCCellKey(endWaypoint.x, endWaypoint.y) : "";
+  const activeSegmentKey = selectedDrone?.path.length ? moduleCCellKey(selectedDrone.path[0].x, selectedDrone.path[0].y) : "";
+  let markup = "";
+  for (let y = 0; y < runtime.currentLevelConfig.grid_rows; y += 1) {
+    for (let x = 0; x < runtime.currentLevelConfig.grid_cols; x += 1) {
+      const key = moduleCCellKey(x, y);
+      const cell = runtime.grid[key];
+      const drone = runtime.drones.find((item) => !item.crashed && item.cell.x === x && item.cell.y === y);
+      const target = runtime.targets.find((item) => !item.completed && item.cell.x === x && item.cell.y === y);
+      const cellClasses = [
+        "module-c-cell",
+        cell.isDanger ? "is-danger" : "",
+        pathKeys.has(key) ? "is-path" : "",
+        key === activeSegmentKey ? "is-path-active" : "",
+        waypointLabels.has(key) ? "is-path-waypoint" : "",
+        key === startKey && selectedDrone?.waypoints.length ? "is-path-start" : "",
+        key === endKey ? "is-path-end" : "",
+        selectedDrone?.cell.x === x && selectedDrone?.cell.y === y ? "is-selected" : "",
+        target?.priority === "high" ? "is-priority" : "",
+      ].filter(Boolean).join(" ");
+      markup += `
+        <button
+          type="button"
+          class="${cellClasses}"
+          data-cell-x="${x}"
+          data-cell-y="${y}"
+          title="${formatModuleCCell({x, y})}"
+        >
+          ${target ? `<span class="cell-target ${target.type}">${MODULE_C_TARGET_META[target.type].short}</span>` : ""}
+          ${drone ? renderModuleCDroneIcon(drone, selectedDrone?.id === drone.id) : ""}
+          ${waypointLabels.has(key) ? `<span class="cell-path-point">${waypointLabels.get(key)}</span>` : ""}
+        </button>
+      `;
+    }
+  }
+  return markup;
+}
+
+function renderModuleCDroneIcon(drone, isSelected) {
+  const color = drone.type === "recon_drone"
+    ? "#6fe38f"
+    : drone.type === "fighter_drone"
+      ? "#6fb8ff"
+      : drone.type === "relay_drone"
+        ? "#ffd56a"
+        : "#ffb36a";
+  const classes = `cell-drone ${drone.type}${isSelected ? " is-selected" : ""}${drone.paused ? " is-paused" : ""}`;
+  return `
+    <span class="${classes}" title="${drone.id}">
+      <svg viewBox="0 0 64 64" aria-hidden="true">
+        <path
+          d="M31 4 L39 18 L55 22 L55 29 L40 29 L47 45 L42 49 L34 37 L34 58 L30 61 L26 58 L26 37 L18 49 L13 45 L20 29 L9 29 L9 22 L25 18 Z"
+          fill="${color}"
+          stroke="rgba(255,255,255,0.78)"
+          stroke-width="2"
+          stroke-linejoin="round"
+        />
+      </svg>
+    </span>
+  `;
+}
+
 async function handleBlockKeydown(event) {
   if (!state.block || event.repeat) {
     return;
@@ -519,6 +732,11 @@ async function handleBlockKeydown(event) {
 
   if (state.block.moduleName === "module_a") {
     await handleModuleAKeydown(event);
+    return;
+  }
+
+  if (state.block.moduleName === "module_c") {
+    await handleModuleCKeydown(event);
     return;
   }
 
@@ -636,6 +854,142 @@ async function handleModuleBKeydown(event) {
   }
 }
 
+async function handleModuleCKeydown(event) {
+  const runtime = state.moduleC;
+  if (!runtime) {
+    return;
+  }
+  const selectedDrone = getSelectedModuleCDrone(runtime);
+  if (event.key === "Backspace") {
+    event.preventDefault();
+    if (selectedDrone && selectedDrone.waypoints.length) {
+      selectedDrone.waypoints.pop();
+      rebuildModuleCDronePath(selectedDrone);
+      appendModuleCEvent(runtime, `${selectedDrone.id} 删除最后一个未来路径点`);
+      renderModuleCScene();
+    }
+    return;
+  }
+  if (event.key === "c" || event.key === "C") {
+    event.preventDefault();
+    if (selectedDrone) {
+      selectedDrone.path = [];
+      selectedDrone.waypoints = [];
+      appendModuleCEvent(runtime, `${selectedDrone.id} 清空未来路径`);
+      await postBlockEvent({
+        event_type: "control",
+        event_subtype: "path_cleared",
+        difficulty_level: runtime.currentLevel,
+        actual_action: selectedDrone.id,
+        correctness: "updated",
+        drone_id: selectedDrone.id,
+        drone_type: selectedDrone.type,
+        drone_state: formatModuleCDroneStatus(selectedDrone),
+      });
+      renderModuleCScene();
+    }
+    return;
+  }
+  if (event.code === "Space") {
+    event.preventDefault();
+    if (selectedDrone && !selectedDrone.crashed) {
+      selectedDrone.paused = !selectedDrone.paused;
+      appendModuleCEvent(runtime, `${selectedDrone.id}${selectedDrone.paused ? " 已暂停" : " 继续执行"}`);
+      await postBlockEvent({
+        event_type: "control",
+        event_subtype: selectedDrone.paused ? "drone_paused" : "drone_resumed",
+        difficulty_level: runtime.currentLevel,
+        actual_action: selectedDrone.id,
+        correctness: "updated",
+        drone_id: selectedDrone.id,
+        drone_type: selectedDrone.type,
+        drone_state: formatModuleCDroneStatus(selectedDrone),
+      });
+      renderModuleCScene();
+    }
+    return;
+  }
+  if (event.key === "Enter") {
+    event.preventDefault();
+    if (selectedDrone && selectedDrone.path.length && !selectedDrone.crashed) {
+      selectedDrone.executing = true;
+      selectedDrone.paused = false;
+      const plannedAt = selectedDrone.pathPlannedAt ?? performance.now();
+      appendModuleCEvent(runtime, `${selectedDrone.id} 开始执行路径`);
+      await postBlockEvent({
+        event_type: "control",
+        event_subtype: "path_execute",
+        difficulty_level: runtime.currentLevel,
+        actual_action: selectedDrone.id,
+        correctness: "pending",
+        reaction_time_ms: Math.round(performance.now() - plannedAt),
+        drone_id: selectedDrone.id,
+        drone_type: selectedDrone.type,
+        drone_state: formatModuleCDroneStatus(selectedDrone),
+        path_length: selectedDrone.path.length,
+        path_points: selectedDrone.path.map((cell) => formatModuleCCell(cell)).join(" -> "),
+      });
+      renderModuleCScene();
+    }
+  }
+}
+
+function handleModuleCCellLeftClick(x, y) {
+  const runtime = state.moduleC;
+  if (!runtime) {
+    return;
+  }
+  const drone = runtime.drones.find((item) => !item.crashed && item.cell.x === x && item.cell.y === y);
+  if (!drone) {
+    return;
+  }
+  runtime.selectedDroneId = drone.id;
+  appendModuleCEvent(runtime, `当前选中：${drone.id}（${drone.label}）`);
+  void postBlockEvent({
+    event_type: "control",
+    event_subtype: "drone_selected",
+    difficulty_level: runtime.currentLevel,
+    actual_action: drone.id,
+    correctness: "updated",
+    drone_id: drone.id,
+    drone_type: drone.type,
+    drone_state: formatModuleCDroneStatus(drone),
+  });
+  renderModuleCScene();
+}
+
+async function handleModuleCCellRightClick(x, y) {
+  const runtime = state.moduleC;
+  const selectedDrone = runtime ? getSelectedModuleCDrone(runtime) : null;
+  if (!runtime || !selectedDrone || selectedDrone.crashed) {
+    return;
+  }
+  const start = selectedDrone.waypoints[selectedDrone.waypoints.length - 1] ?? selectedDrone.cell;
+  const segment = buildModuleCStraightSegment(runtime, start, {x, y});
+  if (!segment.length) {
+    appendModuleCEvent(runtime, `${selectedDrone.id} 只能追加同一行或同一列的直线路径点`);
+    renderModuleCScene();
+    return;
+  }
+  selectedDrone.waypoints.push({x, y});
+  rebuildModuleCDronePath(selectedDrone);
+  selectedDrone.pathPlannedAt = performance.now();
+  appendModuleCEvent(runtime, `${selectedDrone.id} 追加路径至 ${formatModuleCCell({x, y})}`);
+  await postBlockEvent({
+    event_type: "control",
+    event_subtype: "path_append",
+    difficulty_level: runtime.currentLevel,
+    actual_action: selectedDrone.id,
+    correctness: "updated",
+    drone_id: selectedDrone.id,
+    drone_type: selectedDrone.type,
+    drone_state: formatModuleCDroneStatus(selectedDrone),
+    path_length: selectedDrone.path.length,
+    path_points: selectedDrone.path.map((cell) => formatModuleCCell(cell)).join(" -> "),
+  });
+  renderModuleCScene();
+}
+
 async function assignSelectedModuleBTask() {
   const runtime = state.moduleB;
   if (!runtime || !runtime.tasks.length) {
@@ -699,6 +1053,115 @@ async function assignSelectedModuleBTask() {
   ensureModuleBQueueFilled(runtime, 1);
   renderModuleBScene();
   updateBlockStats();
+}
+
+function tickModuleC() {
+  const runtime = state.moduleC;
+  if (!runtime) {
+    return;
+  }
+  const now = performance.now();
+  const deltaSeconds = Math.max(0.05, (now - runtime.lastTickAt) / 1000);
+  runtime.lastTickAt = now;
+  const speed = runtime.currentLevelConfig.speed_cells_per_second;
+  runtime.drones.forEach((drone) => {
+    if (drone.crashed || drone.paused || !drone.executing || !drone.path.length) {
+      return;
+    }
+    drone.progress += deltaSeconds * speed;
+    while (drone.progress >= 1 && drone.path.length) {
+      drone.progress -= 1;
+      const nextCell = drone.path.shift();
+      if (!nextCell) {
+        break;
+      }
+      drone.cell = {x: nextCell.x, y: nextCell.y};
+      if (drone.waypoints.length && drone.waypoints[0].x === drone.cell.x && drone.waypoints[0].y === drone.cell.y) {
+        drone.waypoints.shift();
+      }
+      if (isModuleCDangerCell(runtime, drone.cell.x, drone.cell.y)) {
+        void crashModuleCDrone(runtime, drone);
+        break;
+      }
+      void resolveModuleCTargetArrival(runtime, drone);
+    }
+    if (!drone.path.length) {
+      drone.executing = false;
+      drone.progress = 0;
+    }
+  });
+  renderModuleCScene();
+}
+
+async function resolveModuleCTargetArrival(runtime, drone) {
+  const target = runtime.targets.find((item) => !item.completed && item.cell.x === drone.cell.x && item.cell.y === drone.cell.y);
+  if (!target) {
+    return;
+  }
+  if (drone.targetType === target.type) {
+    target.completed = true;
+    drone.taskChain.push(target.id);
+    runtime.completedCount += 1;
+    appendModuleCEvent(runtime, `${drone.id} 完成目标 ${target.id}`);
+    await postBlockEvent({
+      event_type: "outcome",
+      event_subtype: "target_completed",
+      difficulty_level: runtime.currentLevel,
+      actual_action: drone.id,
+      correctness: "correct",
+      zone_or_task_area: formatModuleCCell(target.cell),
+      task_id: target.id,
+      drone_id: drone.id,
+      drone_type: drone.type,
+      target_kind: target.type,
+      target_label: MODULE_C_TARGET_META[target.type].label,
+      task_priority: target.priority,
+    });
+    return;
+  }
+  appendModuleCEvent(runtime, `${drone.id} 到达 ${target.id}，但机型不匹配`);
+  await postBlockEvent({
+    event_type: "outcome",
+    event_subtype: "wrong_type_arrival",
+    difficulty_level: runtime.currentLevel,
+    actual_action: drone.id,
+    correctness: "wrong_type",
+    zone_or_task_area: formatModuleCCell(target.cell),
+    task_id: target.id,
+    drone_id: drone.id,
+    drone_type: drone.type,
+    target_kind: target.type,
+    target_label: MODULE_C_TARGET_META[target.type].label,
+    task_priority: target.priority,
+  });
+}
+
+async function crashModuleCDrone(runtime, drone) {
+  if (drone.crashed) {
+    return;
+  }
+  drone.crashed = true;
+  drone.executing = false;
+  drone.paused = false;
+  drone.path = [];
+  drone.waypoints = [];
+  runtime.crashedCount += 1;
+  appendModuleCEvent(runtime, `${drone.id} 已坠毁`);
+  if (runtime.selectedDroneId === drone.id) {
+    runtime.selectedDroneId = runtime.drones.find((item) => !item.crashed)?.id ?? "";
+  }
+  await postBlockEvent({
+    event_type: "outcome",
+    event_subtype: "drone_crashed",
+    difficulty_level: runtime.currentLevel,
+    actual_action: drone.id,
+    correctness: "danger_violation",
+    zone_or_task_area: formatModuleCCell(drone.cell),
+    drone_id: drone.id,
+    drone_type: drone.type,
+    drone_state: "已坠毁",
+    drone_loss_count: runtime.crashedCount,
+  });
 }
 
 function scheduleNextModuleAEvent() {
@@ -1408,6 +1871,294 @@ function syncModuleBRuleLine() {
   runtime.ruleNode.textContent = `规则 ${runtime.ruleVersion}：${runtime.activeRules.map((rule) => rule.label).join(" / ")}`;
 }
 
+function generateModuleCGrid(levelConfig) {
+  const grid = {};
+  for (let y = 0; y < levelConfig.grid_rows; y += 1) {
+    for (let x = 0; x < levelConfig.grid_cols; x += 1) {
+      grid[moduleCCellKey(x, y)] = {x, y, isDanger: false};
+    }
+  }
+  const targetDangerCount = Math.floor(levelConfig.grid_cols * levelConfig.grid_rows * levelConfig.danger_ratio);
+  let placed = 0;
+  while (placed < targetDangerCount) {
+    const x = randomBetween(0, levelConfig.grid_cols - 1);
+    const y = randomBetween(0, levelConfig.grid_rows - 1);
+    if ((x <= 1 && y <= 1) || (x >= levelConfig.grid_cols - 2 && y >= levelConfig.grid_rows - 2)) {
+      continue;
+    }
+    const key = moduleCCellKey(x, y);
+    if (!grid[key].isDanger) {
+      grid[key].isDanger = true;
+      placed += 1;
+    }
+  }
+  return grid;
+}
+
+function createModuleCDrones(levelConfig, grid) {
+  const drones = [];
+  const spawnCells = collectModuleCOpenCells(grid, levelConfig).filter((cell) => cell.x < 2 && cell.y < 2 + levelConfig.drone_count);
+  for (let index = 0; index < levelConfig.drone_count; index += 1) {
+    const template = MODULE_C_DRONE_TEMPLATES[index];
+    const cell = spawnCells[index] ?? collectModuleCOpenCells(grid, levelConfig)[index];
+    drones.push({
+      ...template,
+      cell: {x: cell.x, y: cell.y},
+      path: [],
+      waypoints: [],
+      executing: false,
+      paused: false,
+      crashed: false,
+      progress: 0,
+      taskChain: [],
+      pathPlannedAt: null,
+    });
+  }
+  return drones;
+}
+
+function createModuleCTargets(levelConfig, grid, drones) {
+  const openCells = collectModuleCOpenCells(grid, levelConfig).filter((cell) => !drones.some((drone) => drone.cell.x === cell.x && drone.cell.y === cell.y));
+  const runtimeStub = {grid, currentLevelConfig: levelConfig};
+  const targets = [];
+  const priorityIndices = new Set();
+  while (priorityIndices.size < levelConfig.priority_target_count) {
+    priorityIndices.add(randomBetween(0, Math.max(0, levelConfig.target_count - 1)));
+  }
+  for (let index = 0; index < levelConfig.target_count; index += 1) {
+    const type = levelConfig.target_types[index % levelConfig.target_types.length];
+    const candidateIndex = openCells.findIndex((cell) => drones
+      .filter((drone) => drone.targetType === type)
+      .some((drone) => buildModuleCPath(runtimeStub, drone.cell, cell).length > 0));
+    const cell = candidateIndex >= 0 ? openCells.splice(candidateIndex, 1)[0] : openCells.pop();
+    if (!cell) {
+      break;
+    }
+    targets.push({
+      id: `T${index + 1}`,
+      type,
+      priority: priorityIndices.has(index) ? "high" : "normal",
+      cell: {x: cell.x, y: cell.y},
+      completed: false,
+    });
+  }
+  return targets;
+}
+
+function collectModuleCOpenCells(grid, levelConfig) {
+  const cells = [];
+  for (let y = 0; y < levelConfig.grid_rows; y += 1) {
+    for (let x = 0; x < levelConfig.grid_cols; x += 1) {
+      const key = moduleCCellKey(x, y);
+      if (!grid[key].isDanger) {
+        cells.push({x, y});
+      }
+    }
+  }
+  return shuffle(cells);
+}
+
+async function logInitialModuleCTargets(runtime) {
+  for (const target of runtime.targets) {
+    await postBlockEvent({
+      event_type: "stimulus",
+      event_subtype: "target_spawned",
+      difficulty_level: runtime.currentLevel,
+      correctness: "pending",
+      zone_or_task_area: formatModuleCCell(target.cell),
+      task_id: target.id,
+      task_priority: target.priority === "high" ? "high" : "medium",
+      target_kind: target.type,
+      target_label: MODULE_C_TARGET_META[target.type].label,
+    });
+  }
+}
+
+function scheduleModuleCDynamicEvents(runtime) {
+  const blockDurationMs = state.block.durationSeconds * 1000;
+  const hazardCount = runtime.currentLevelConfig.hazard_events ?? 0;
+  const newTargetCount = runtime.currentLevelConfig.new_target_events ?? 0;
+  for (let index = 0; index < hazardCount; index += 1) {
+    const timeout = window.setTimeout(() => {
+      void spawnModuleCHazard(runtime);
+    }, Math.round(blockDurationMs * ((index + 1) / (hazardCount + 2))));
+    runtime.pendingHazardTimeouts.push(timeout);
+  }
+  for (let index = 0; index < newTargetCount; index += 1) {
+    const timeout = window.setTimeout(() => {
+      void spawnModuleCNewTarget(runtime);
+    }, Math.round(blockDurationMs * ((index + 1.5) / (newTargetCount + 2.5))));
+    runtime.pendingTargetTimeouts.push(timeout);
+  }
+}
+
+async function spawnModuleCHazard(runtime) {
+  if (!state.moduleC || state.finishingBlock) {
+    return;
+  }
+  const blockedKeys = new Set([
+    ...runtime.drones.filter((drone) => !drone.crashed).map((drone) => moduleCCellKey(drone.cell.x, drone.cell.y)),
+    ...runtime.targets.filter((target) => !target.completed).map((target) => moduleCCellKey(target.cell.x, target.cell.y)),
+  ]);
+  const candidates = Object.values(runtime.grid).filter((cell) => !cell.isDanger && !blockedKeys.has(moduleCCellKey(cell.x, cell.y)));
+  const picked = pickRandom(candidates);
+  if (!picked) {
+    return;
+  }
+  runtime.grid[moduleCCellKey(picked.x, picked.y)].isDanger = true;
+  appendModuleCEvent(runtime, `区域 ${formatModuleCCell(picked)} 转为危险区`);
+  await postBlockEvent({
+    event_type: "system",
+    event_subtype: "dynamic_hazard_spawned",
+    difficulty_level: runtime.currentLevel,
+    correctness: "updated",
+    zone_or_task_area: formatModuleCCell(picked),
+    hazard_count: (runtime.currentLevelConfig.hazard_events ?? 0),
+  });
+  renderModuleCScene();
+}
+
+async function spawnModuleCNewTarget(runtime) {
+  if (!state.moduleC || state.finishingBlock) {
+    return;
+  }
+  const occupied = new Set([
+    ...runtime.drones.filter((drone) => !drone.crashed).map((drone) => moduleCCellKey(drone.cell.x, drone.cell.y)),
+    ...runtime.targets.filter((target) => !target.completed).map((target) => moduleCCellKey(target.cell.x, target.cell.y)),
+  ]);
+  const candidates = Object.values(runtime.grid).filter((cell) => !cell.isDanger && !occupied.has(moduleCCellKey(cell.x, cell.y)));
+  const picked = pickRandom(candidates);
+  if (!picked) {
+    return;
+  }
+  const type = pickRandom(runtime.currentLevelConfig.target_types);
+  const target = {
+    id: `T${runtime.targets.length + 1}`,
+    type,
+    priority: "high",
+    cell: {x: picked.x, y: picked.y},
+    completed: false,
+  };
+  runtime.targets.push(target);
+  appendModuleCEvent(runtime, `新高优先级目标出现：${target.id}`);
+  await postBlockEvent({
+    event_type: "stimulus",
+    event_subtype: "new_target_spawned",
+    difficulty_level: runtime.currentLevel,
+    correctness: "pending",
+    zone_or_task_area: formatModuleCCell(target.cell),
+    task_id: target.id,
+    task_priority: "high",
+    target_kind: target.type,
+    target_label: MODULE_C_TARGET_META[target.type].label,
+  });
+  renderModuleCScene();
+}
+
+function buildModuleCPath(runtime, start, goal) {
+  if (start.x === goal.x && start.y === goal.y) {
+    return [];
+  }
+  const queue = [{x: start.x, y: start.y}];
+  const visited = new Set([moduleCCellKey(start.x, start.y)]);
+  const parent = new Map();
+  while (queue.length) {
+    const current = queue.shift();
+    if (!current) {
+      break;
+    }
+    const neighbors = [
+      {x: current.x + 1, y: current.y},
+      {x: current.x - 1, y: current.y},
+      {x: current.x, y: current.y + 1},
+      {x: current.x, y: current.y - 1},
+    ];
+    for (const next of neighbors) {
+      if (!isModuleCWithinBounds(runtime, next.x, next.y)) {
+        continue;
+      }
+      const key = moduleCCellKey(next.x, next.y);
+      if (visited.has(key)) {
+        continue;
+      }
+      if (isModuleCDangerCell(runtime, next.x, next.y)) {
+        continue;
+      }
+      visited.add(key);
+      parent.set(key, current);
+      if (next.x === goal.x && next.y === goal.y) {
+        const path = [{x: goal.x, y: goal.y}];
+        let cursor = current;
+        while (!(cursor.x === start.x && cursor.y === start.y)) {
+          path.push({x: cursor.x, y: cursor.y});
+          const parentCell = parent.get(moduleCCellKey(cursor.x, cursor.y));
+          if (!parentCell) {
+            break;
+          }
+          cursor = parentCell;
+        }
+        return path.reverse();
+      }
+      queue.push(next);
+    }
+  }
+  return [];
+}
+
+function buildModuleCStraightSegment(runtime, start, goal) {
+  if (start.x === goal.x && start.y === goal.y) {
+    return [];
+  }
+  if (start.x !== goal.x && start.y !== goal.y) {
+    return [];
+  }
+  const segment = [];
+  const stepX = goal.x === start.x ? 0 : goal.x > start.x ? 1 : -1;
+  const stepY = goal.y === start.y ? 0 : goal.y > start.y ? 1 : -1;
+  let cursorX = start.x + stepX;
+  let cursorY = start.y + stepY;
+  while (cursorX !== goal.x || cursorY !== goal.y) {
+    if (!isModuleCWithinBounds(runtime, cursorX, cursorY)) {
+      return [];
+    }
+    segment.push({x: cursorX, y: cursorY});
+    cursorX += stepX;
+    cursorY += stepY;
+  }
+  if (!isModuleCWithinBounds(runtime, goal.x, goal.y)) {
+    return [];
+  }
+  segment.push({x: goal.x, y: goal.y});
+  return segment;
+}
+
+function rebuildModuleCDronePath(drone) {
+  const path = [];
+  let cursor = drone.cell;
+  for (const waypoint of drone.waypoints) {
+    const stepX = waypoint.x === cursor.x ? 0 : waypoint.x > cursor.x ? 1 : -1;
+    const stepY = waypoint.y === cursor.y ? 0 : waypoint.y > cursor.y ? 1 : -1;
+    let x = cursor.x + stepX;
+    let y = cursor.y + stepY;
+    while (x !== waypoint.x || y !== waypoint.y) {
+      path.push({x, y});
+      x += stepX;
+      y += stepY;
+    }
+    path.push({x: waypoint.x, y: waypoint.y});
+    cursor = waypoint;
+  }
+  drone.path = path;
+}
+
+function getSelectedModuleCDrone(runtime) {
+  return runtime.drones.find((item) => item.id === runtime.selectedDroneId && !item.crashed) ?? null;
+}
+
+function appendModuleCEvent(runtime, message) {
+  runtime.eventFeed = [message, ...runtime.eventFeed].slice(0, 6);
+}
+
 async function finishBlock() {
   if (state.finishingBlock) {
     return;
@@ -1454,6 +2205,9 @@ function formatResultMetrics(moduleName, metrics) {
   if (moduleName === "module_b") {
     return formatModuleBResultMetrics(metrics);
   }
+  if (moduleName === "module_c") {
+    return formatModuleCResultMetrics(metrics);
+  }
   return formatModuleAResultMetrics(metrics);
 }
 
@@ -1493,6 +2247,29 @@ function formatModuleBResultMetrics(metrics) {
     ["规则更新数", metrics.rule_update_count],
     ["前后期表现变化", formatSignedNumber(metrics.performance_drift)],
     ["时间窗数量", metrics.window_count],
+  ];
+  return rows
+    .filter(([, value]) => value !== undefined)
+    .map(([label, value]) => `${label}: ${value === null ? "-" : value}`)
+    .join("\n");
+}
+
+function formatModuleCResultMetrics(metrics) {
+  if (!metrics || typeof metrics !== "object") {
+    return "暂无指标";
+  }
+  const rows = [
+    ["任务完成率", formatRatio(metrics.task_completion_rate)],
+    ["分配正确率", formatRatio(metrics.assignment_accuracy)],
+    ["高优先级完成率", formatRatio(metrics.priority_completion_rate)],
+    ["坠毁数", metrics.drone_loss_count],
+    ["路径执行次数", metrics.path_execute_count],
+    ["路径追加次数", metrics.path_append_count],
+    ["暂停次数", metrics.pause_count],
+    ["平均规划时(ms)", formatNumber(metrics.mean_planning_time_ms)],
+    ["平均路径长度", formatNumber(metrics.mean_path_length)],
+    ["危险区事件数", metrics.dynamic_hazard_count],
+    ["新增目标数", metrics.new_target_count],
   ];
   return rows
     .filter(([, value]) => value !== undefined)
@@ -1555,6 +2332,10 @@ function getModuleALevelConfig(level) {
 
 function getModuleBLevelConfig(level) {
   return state.bootstrap.modules.module_b.levels[level];
+}
+
+function getModuleCLevelConfig(level) {
+  return state.bootstrap.modules.module_c.levels[level];
 }
 
 function getActiveInstrumentIds(count) {
@@ -1645,6 +2426,51 @@ function compactPath(fullPath) {
   }
   const parts = fullPath.split("/");
   return parts.slice(-2).join("/");
+}
+
+function moduleCCellKey(x, y) {
+  return `${x},${y}`;
+}
+
+function formatModuleCCell(cell) {
+  return `${cell.x + 1}-${cell.y + 1}`;
+}
+
+function formatModuleCDroneStatus(drone) {
+  if (drone.crashed) {
+    return "已坠毁";
+  }
+  if (drone.paused) {
+    return "已暂停";
+  }
+  if (drone.executing && drone.path.length) {
+    return "飞行中";
+  }
+  return "待命";
+}
+
+function formatModuleCEta(pathLength, speed) {
+  if (!pathLength || !speed) {
+    return "-";
+  }
+  return `${(pathLength / speed).toFixed(1)}s`;
+}
+
+function isModuleCWithinBounds(runtime, x, y) {
+  return x >= 0 && y >= 0 && x < runtime.currentLevelConfig.grid_cols && y < runtime.currentLevelConfig.grid_rows;
+}
+
+function isModuleCDangerCell(runtime, x, y) {
+  return Boolean(runtime.grid[moduleCCellKey(x, y)]?.isDanger);
+}
+
+function shuffle(items) {
+  const next = [...items];
+  for (let index = next.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    [next[index], next[swapIndex]] = [next[swapIndex], next[index]];
+  }
+  return next;
 }
 
 function formatTaskPriority(priority) {
@@ -1738,6 +2564,12 @@ function clearTimers() {
   }
   if (state.moduleB?.nextRuleUpdateTimeout) {
     window.clearTimeout(state.moduleB.nextRuleUpdateTimeout);
+  }
+  if (state.moduleC?.pendingHazardTimeouts?.length) {
+    state.moduleC.pendingHazardTimeouts.forEach((timeout) => window.clearTimeout(timeout));
+  }
+  if (state.moduleC?.pendingTargetTimeouts?.length) {
+    state.moduleC.pendingTargetTimeouts.forEach((timeout) => window.clearTimeout(timeout));
   }
   window.removeEventListener("keydown", handleBlockKeydown);
 }

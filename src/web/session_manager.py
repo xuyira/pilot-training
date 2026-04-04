@@ -12,6 +12,7 @@ from src.data.models import ParticipantInfo, RunSelection, SessionContext
 from src.modules.base import build_block_summary
 from src.modules.module_a import MODULE_A_SPEC
 from src.modules.module_b import MODULE_B_SPEC
+from src.modules.module_c import MODULE_C_SPEC
 
 
 @dataclass
@@ -53,6 +54,13 @@ class SessionManager:
                     "keyHints": MODULE_B_SPEC.key_hints,
                     "introLines": MODULE_B_SPEC.intro_lines,
                     "levels": self.config_bundle["module_b_levels"],
+                },
+                "module_c": {
+                    "label": "多无人机网格规划分配训练",
+                    "description": "网格规划与持续调度",
+                    "keyHints": MODULE_C_SPEC.key_hints,
+                    "introLines": MODULE_C_SPEC.intro_lines,
+                    "levels": self.config_bundle["module_c_levels"],
                 },
             },
             "modes": [
@@ -116,7 +124,7 @@ class SessionManager:
         session.marker_client.send_marker(context, "block_start", block_id, level)
         session.marker_client.send_marker(
             context,
-            "module_A_start" if module_name == "module_a" else "module_B_start",
+            "module_A_start" if module_name == "module_a" else "module_B_start" if module_name == "module_b" else "module_C_start",
             block_id,
             level,
         )
@@ -208,7 +216,7 @@ class SessionManager:
         adapt_action = session.last_adapt_action
         session.marker_client.send_marker(
             context,
-            "module_A_end" if context.selection.module_name == "module_a" else "module_B_end",
+            "module_A_end" if context.selection.module_name == "module_a" else "module_B_end" if context.selection.module_name == "module_b" else "module_C_end",
             block_id,
             next_level,
         )
@@ -223,6 +231,8 @@ class SessionManager:
                 "Module A immersive block executed."
                 if context.selection.module_name == "module_a"
                 else "Module B multi-drone assignment block executed."
+                if context.selection.module_name == "module_b"
+                else "Module C grid planning block executed."
             ),
         )
         summary.adaptive_decision = adapt_action
@@ -251,11 +261,17 @@ class SessionManager:
         return self.sessions[token]
 
     def _module_level_config(self, module_name: str, level: str) -> dict[str, Any]:
-        key = "module_a_levels" if module_name == "module_a" else "module_b_levels"
+        key = (
+            "module_a_levels"
+            if module_name == "module_a"
+            else "module_b_levels"
+            if module_name == "module_b"
+            else "module_c_levels"
+        )
         return self.config_bundle[key][level]
 
     def _module_spec(self, module_name: str) -> dict[str, Any]:
-        spec = MODULE_A_SPEC if module_name == "module_a" else MODULE_B_SPEC
+        spec = MODULE_A_SPEC if module_name == "module_a" else MODULE_B_SPEC if module_name == "module_b" else MODULE_C_SPEC
         return {
             "name": spec.name,
             "keyHints": spec.key_hints,

@@ -20,5 +20,6 @@ class ConfigLoader:
             "base": self.load_json("base_config.json"),
             "module_a_levels": self.load_json("module_a_levels.json"),
             "module_b_levels": self.load_json("module_b_levels.json"),
+            "module_c_levels": self.load_json("module_c_levels.json"),
             "marker_map": self.load_json("marker_map.json"),
         }

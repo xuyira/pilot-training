@@ -75,7 +75,15 @@
       "priority_accuracy",
       "rule_violation_rate",
       "timeout_rate",
-      "window_assignment_count"
+      "window_assignment_count",
+      "path_length",
+      "drone_type",
+      "target_kind",
+      "target_label",
+      "path_points",
+      "drone_state",
+      "hazard_count",
+      "drone_loss_count"
     ],
     "block_summary_headers": [
       "subject_id",

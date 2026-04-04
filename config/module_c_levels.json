@@ -1,0 +1,62 @@
+{
+  "L1": {
+    "grid_cols": 8,
+    "grid_rows": 8,
+    "danger_ratio": 0.08,
+    "drone_count": 1,
+    "target_count": 2,
+    "target_types": ["recon"],
+    "priority_target_count": 0,
+    "hazard_events": 0,
+    "new_target_events": 0,
+    "speed_cells_per_second": 2.0
+  },
+  "L2": {
+    "grid_cols": 10,
+    "grid_rows": 10,
+    "danger_ratio": 0.12,
+    "drone_count": 2,
+    "target_count": 4,
+    "target_types": ["recon", "intercept"],
+    "priority_target_count": 1,
+    "hazard_events": 0,
+    "new_target_events": 0,
+    "speed_cells_per_second": 2.0
+  },
+  "L3": {
+    "grid_cols": 12,
+    "grid_rows": 12,
+    "danger_ratio": 0.16,
+    "drone_count": 3,
+    "target_count": 6,
+    "target_types": ["recon", "intercept", "relay"],
+    "priority_target_count": 2,
+    "hazard_events": 1,
+    "new_target_events": 1,
+    "speed_cells_per_second": 2.2
+  },
+  "L4": {
+    "grid_cols": 14,
+    "grid_rows": 14,
+    "danger_ratio": 0.2,
+    "drone_count": 4,
+    "target_count": 8,
+    "target_types": ["recon", "intercept", "relay", "supply"],
+    "priority_target_count": 3,
+    "hazard_events": 2,
+    "new_target_events": 1,
+    "speed_cells_per_second": 2.4
+  },
+  "L5": {
+    "grid_cols": 16,
+    "grid_rows": 16,
+    "danger_ratio": 0.24,
+    "drone_count": 5,
+    "target_count": 10,
+    "target_types": ["recon", "intercept", "relay", "supply"],
+    "priority_target_count": 4,
+    "hazard_events": 3,
+    "new_target_events": 2,
+    "speed_cells_per_second": 2.6
+  }
+}

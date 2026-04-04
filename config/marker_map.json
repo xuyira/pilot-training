@@ -7,6 +7,8 @@
   "module_A_end": 201,
   "module_B_start": 300,
   "module_B_end": 301,
+  "module_C_start": 320,
+  "module_C_end": 321,
   "block_start": 400,
   "block_end": 401,
   "difficulty_level": 410,

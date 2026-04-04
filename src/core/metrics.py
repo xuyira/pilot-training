@@ -66,6 +66,46 @@ def build_module_b_metrics(events: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def build_module_c_metrics(events: list[dict[str, Any]]) -> dict[str, Any]:
+    completed = [event for event in events if event.get("event_subtype") == "target_completed"]
+    wrong_type = [event for event in events if event.get("event_subtype") == "wrong_type_arrival"]
+    crashed = [event for event in events if event.get("event_subtype") == "drone_crashed"]
+    path_executes = [event for event in events if event.get("event_subtype") == "path_execute"]
+    path_appends = [event for event in events if event.get("event_subtype") == "path_append"]
+    paused = [event for event in events if event.get("event_subtype") == "drone_paused"]
+    hazards = [event for event in events if event.get("event_subtype") == "dynamic_hazard_spawned"]
+    new_targets = [event for event in events if event.get("event_subtype") == "new_target_spawned"]
+
+    total_targets_seen = sum(1 for event in events if event.get("event_subtype") in {"target_spawned", "new_target_spawned"})
+    priority_targets_seen = sum(1 for event in events if event.get("event_subtype") in {"target_spawned", "new_target_spawned"} and event.get("task_priority") == "high")
+    priority_completed = sum(1 for event in completed if event.get("task_priority") == "high")
+    path_lengths = [
+        float(event["path_length"])
+        for event in path_executes
+        if isinstance(event.get("path_length"), (int, float))
+    ]
+    planning_times = [
+        float(event["reaction_time_ms"])
+        for event in path_executes
+        if isinstance(event.get("reaction_time_ms"), (int, float))
+    ]
+
+    return {
+        "implemented": True,
+        "task_completion_rate": round(len(completed) / (total_targets_seen or 1), 3),
+        "assignment_accuracy": round(len(completed) / ((len(completed) + len(wrong_type)) or 1), 3),
+        "priority_completion_rate": round(priority_completed / (priority_targets_seen or 1), 3) if priority_targets_seen else None,
+        "drone_loss_count": len(crashed),
+        "path_execute_count": len(path_executes),
+        "path_append_count": len(path_appends),
+        "pause_count": len(paused),
+        "mean_planning_time_ms": round(mean(planning_times), 2) if planning_times else None,
+        "mean_path_length": round(mean(path_lengths), 2) if path_lengths else None,
+        "dynamic_hazard_count": len(hazards),
+        "new_target_count": len(new_targets),
+    }
+
+
 def build_module_a_metrics(events: list[dict[str, Any]]) -> dict[str, Any]:
     target_events = [event for event in events if event.get("event_subtype") == "target_alarm_onset"]
     correct_events = [event for event in events if event.get("event_subtype") == "target_correct"]
