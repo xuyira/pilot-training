@@ -570,6 +570,10 @@ function renderModuleCScene() {
   if (!runtime) {
     return;
   }
+  const existingTopPanel = runtime.sceneNode.querySelector('[data-panel="status"]');
+  const existingRulePanel = runtime.sceneNode.querySelector('[data-panel="rules"]');
+  runtime.statusPanelScrollTop = existingTopPanel ? existingTopPanel.scrollTop : runtime.statusPanelScrollTop ?? 0;
+  runtime.rulesPanelScrollTop = existingRulePanel ? existingRulePanel.scrollTop : runtime.rulesPanelScrollTop ?? 0;
   runtime.sceneNode.className = "module-scene module-c-scene";
   runtime.levelNode.textContent = runtime.currentLevel;
   runtime.ruleNode.textContent = "事实提示区不会给出推荐路线或危险预警。";
@@ -589,7 +593,7 @@ function renderModuleCScene() {
       >${boardMarkup}</div>
     </section>
     <aside class="module-c-side">
-      <section class="module-c-side-card">
+      <section class="module-c-side-card" data-panel="status">
         <div class="module-c-stats">
           <div>
             <p class="section-label">状态提示</p>
@@ -621,7 +625,7 @@ function renderModuleCScene() {
           </div>
         </div>
       </section>
-      <section class="module-c-side-card">
+      <section class="module-c-side-card" data-panel="rules">
         <div class="module-c-rules">
           <div>
             <p class="section-label">规则说明</p>
@@ -637,6 +641,15 @@ function renderModuleCScene() {
       </section>
     </aside>
   `;
+
+  const statusPanel = runtime.sceneNode.querySelector('[data-panel="status"]');
+  const rulesPanel = runtime.sceneNode.querySelector('[data-panel="rules"]');
+  if (statusPanel) {
+    statusPanel.scrollTop = runtime.statusPanelScrollTop ?? 0;
+  }
+  if (rulesPanel) {
+    rulesPanel.scrollTop = runtime.rulesPanelScrollTop ?? 0;
+  }
 
   runtime.sceneNode.querySelectorAll("[data-cell-x]").forEach((cellNode) => {
     cellNode.addEventListener("click", (event) => {

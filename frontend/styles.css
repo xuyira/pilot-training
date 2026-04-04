@@ -541,7 +541,7 @@ button:focus {
 
 .module-c-side {
   display: grid;
-  grid-template-rows: minmax(0, 1fr) minmax(0, 0.92fr);
+  grid-template-rows: minmax(0, 1fr) minmax(0, 0.68fr);
   gap: 18px;
   min-height: 0;
   overflow: hidden;
@@ -559,7 +559,7 @@ button:focus {
 .module-c-events,
 .module-c-rules {
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 
 .module-c-stats-grid,
@@ -582,13 +582,14 @@ button:focus {
 .module-c-events li,
 .module-c-rules li {
   color: var(--muted);
+  font-size: 0.88rem;
 }
 
 .module-c-stat strong,
 .module-c-info strong {
   display: block;
-  margin-top: 4px;
-  font-size: 0.96rem;
+  margin-top: 2px;
+  font-size: 0.88rem;
   color: var(--text);
 }
 
@@ -597,8 +598,20 @@ button:focus {
   margin: 0;
   padding-left: 18px;
   display: grid;
-  gap: 6px;
-  font-size: 0.92rem;
+  gap: 5px;
+  font-size: 0.84rem;
+}
+
+.module-c-stats h2,
+.module-c-selected h2,
+.module-c-rules h2 {
+  margin: 0;
+  font-size: 1.08rem;
+}
+
+.module-c-side .section-label {
+  margin-bottom: 2px;
+  font-size: 0.68rem;
 }
 
 .module-c-side-card::-webkit-scrollbar {
@@ -1077,12 +1090,20 @@ button:focus {
 }
 
 .module-c-fullscreen .immersive-hud h2 {
-  font-size: 1.4rem;
+  font-size: 1.18rem;
 }
 
 .module-c-fullscreen .timer-card {
   min-height: 34px;
   padding: 8px 10px;
+}
+
+.module-c-fullscreen .timer-card span {
+  font-size: 0.76rem;
+}
+
+.module-c-fullscreen .timer-card strong {
+  font-size: 1rem;
 }
 
 .module-c-fullscreen .module-scene {
